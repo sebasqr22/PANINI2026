@@ -1,19 +1,21 @@
-import { Component, Input, computed } from '@angular/core';
+import { Component, Input, computed, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Sticker } from '../../models/sticker.model';
 import { CollectionService } from '../../services/collection.service';
-import { EventEmitter, Output } from '@angular/core';
 
 @Component({
   selector: 'app-sticker-card',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="card" [class.owned]="owned()" [class.repeated]="repeated() > 0"
-      [class.foil]="sticker.type === 'foil'" [class.history]="sticker.type === 'history'"
-      [class.coca]="sticker.section === 'coca'" (click)="selected.emit(sticker)">
+    <div class="card"
+      [class.owned]="owned()"
+      [class.repeated]="repeated() > 0"
+      [class.foil]="sticker.type === 'foil'"
+      [class.history]="sticker.type === 'history'"
+      [class.coca]="sticker.section === 'coca'"
+      (click)="selected.emit(sticker)">
       @if (repeated() > 0) { <span class="rep-badge">+{{ repeated() }}</span> }
-      <span class="sticker-id">{{ sticker.id }}</span>
       <span class="sticker-icon">
         @if (sticker.section === 'coca') { 🥤 }
         @else if (sticker.type === 'foil') { ✨ }
@@ -22,7 +24,7 @@ import { EventEmitter, Output } from '@angular/core';
         @else if (sticker.name.includes('Escudo')) { 🛡️ }
         @else { ⚽ }
       </span>
-      <span class="sticker-name">{{ sticker.name }}</span>
+      <span class="sticker-id">{{ sticker.id }}</span>
       @if (owned()) { <span class="checkmark">✓</span> }
     </div>
   `,
@@ -30,37 +32,54 @@ import { EventEmitter, Output } from '@angular/core';
     .card {
       border: 1.5px solid rgba(255,130,0,.1);
       border-radius: 8px;
-      padding: .45rem .35rem;
+      padding: .5rem .35rem;
       text-align: center;
       cursor: pointer;
       transition: all .12s;
       background: #0f0800;
       position: relative;
       user-select: none;
-      min-height: 90px;
+      min-height: 75px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 2px;
+      gap: 4px;
     }
-    .card:hover { border-color: rgba(255,130,0,.3); background: #160b00; transform: translateY(-1px); }
+    .card:hover { border-color: rgba(255,130,0,.35); background: #160b00; transform: translateY(-1px); }
     .card:active { transform: scale(.96); }
     .card.owned { background: rgba(46,204,113,.08); border-color: rgba(46,204,113,.4); }
-    .card.owned .sticker-id { color: #2ecc71; }
     .card.repeated { background: rgba(52,152,219,.08); border-color: rgba(52,152,219,.4); }
     .card.foil { border-color: rgba(255,130,0,.3); }
-    .card.foil .sticker-id { color: #ff8200; }
-    .card.history .sticker-id { color: #c084fc; }
+    .card.history { border-color: rgba(192,132,252,.25); }
     .card.coca { background: rgba(208,2,27,.07); border-color: rgba(208,2,27,.3); }
-    .card.coca .sticker-id { color: #ff4444; }
     .card.coca.owned { background: rgba(208,2,27,.15); }
-    .sticker-id { font-size: .6rem; font-weight: 800; color: rgba(255,130,0,.3); letter-spacing: .5px; text-transform: uppercase; }
-    .sticker-icon { font-size: 1.1rem; line-height: 1; }
-    .sticker-name { font-size: .58rem; color: rgba(240,224,204,.4); line-height: 1.25; word-break: break-word; }
-    .card.owned .sticker-name { color: rgba(240,224,204,.7); }
-    .rep-badge { position: absolute; top: 3px; right: 3px; background: #3498db; color: white; font-size: .55rem; font-weight: 800; padding: 1px 4px; border-radius: 4px; }
-    .checkmark { position: absolute; bottom: 3px; right: 4px; color: #2ecc71; font-size: .7rem; font-weight: 900; }
+
+    .sticker-icon { font-size: 1.3rem; line-height: 1; }
+
+    .sticker-id {
+      font-size: .72rem;
+      font-weight: 800;
+      color: rgba(255,130,0,.5);
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+    .card.owned .sticker-id { color: #2ecc71; }
+    .card.repeated .sticker-id { color: #3498db; }
+    .card.history .sticker-id { color: #c084fc; }
+    .card.coca .sticker-id { color: #ff4444; }
+    .card.coca.owned .sticker-id { color: #ff6666; }
+
+    .rep-badge {
+      position: absolute; top: 3px; right: 3px;
+      background: #3498db; color: white;
+      font-size: .55rem; font-weight: 800;
+      padding: 1px 4px; border-radius: 4px;
+    }
+    .checkmark {
+      position: absolute; bottom: 3px; right: 4px;
+      color: #2ecc71; font-size: .7rem; font-weight: 900;
+    }
   `]
 })
 export class StickerCardComponent {

@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
 import { CollectionService } from './collection.service';
 import { TEAMS, FWC_STICKERS, COCA_STICKERS } from '../models/album-data';
-import { Sticker } from '../models/sticker.model';
 import jsPDF from 'jspdf';
 
 @Injectable({ providedIn: 'root' })
@@ -15,173 +14,142 @@ export class PdfService {
 
     let y = 20;
     this.addTitle(doc, `Postales Faltantes — ${user}`, y);
-    y += 10;
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Total faltantes: ${this.col.missingCount()} de ${this.col.totalBase} (álbum base)`, 14, y);
-    y += 8;
-    doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}`, 14, y);
+    y += 18;
+    doc.setFontSize(9); doc.setTextColor(120);
+    doc.text(`Faltan: ${this.col.missingCount()} de ${this.col.totalBase}   ·   ${new Date().toLocaleDateString('es-CR')}`, 14, y);
     y += 12;
 
-    // FWC missing
-    const fwcMissing = FWC_STICKERS.filter(s => missingIds.has(s.id));
-    if (fwcMissing.length) {
-      y = this.addSection(doc, 'Sección FWC (Introducción e Historia)', fwcMissing, y);
-    }
+    // FWC
+    const fwcMissing = FWC_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
+    if (fwcMissing.length) y = this.addIdList(doc, 'Sección FWC', fwcMissing, y);
 
-    // Teams missing
+    // Teams
     for (const team of TEAMS) {
-      const tm = team.stickers.filter(s => missingIds.has(s.id));
-      if (tm.length > 0) {
-        y = this.addSection(doc, `${team.name} (${tm.length} faltantes)`, tm, y);
-      }
+      const ids = team.stickers.filter(s => missingIds.has(s.id)).map(s => s.id);
+      if (ids.length) y = this.addIdList(doc, `${team.flag} ${team.name} (${team.group})`, ids, y);
     }
 
     // Coca
-    const cocaMissing = COCA_STICKERS.filter(s => missingIds.has(s.id));
-    if (cocaMissing.length) {
-      y = this.checkPageBreak(doc, y, 30);
-      y = this.addSection(doc, 'Coca-Cola Exclusivas', cocaMissing, y);
-    }
+    const cocaMissing = COCA_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
+    if (cocaMissing.length) y = this.addIdList(doc, '🥤 Coca-Cola', cocaMissing, y);
 
-    doc.save(`panini2026_faltantes_${user}.pdf`);
+    doc.save(`urisco_faltantes_${user}.pdf`);
   }
 
   exportRepeated(): void {
     const doc = new jsPDF();
     const user = this.col.currentUser() ?? 'Usuario';
-    const repeated = this.col.getRepeatedMap();
-    const repIds = Object.keys(repeated).filter(k => repeated[k] > 0);
+    const repMap = this.col.getRepeatedMap();
+    const repIds = Object.keys(repMap).filter(k => repMap[k] > 0);
 
     let y = 20;
     this.addTitle(doc, `Postales Repetidas — ${user}`, y);
-    y += 10;
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Total repetidas: ${this.col.repeatedCount()} stickers`, 14, y);
-    y += 8;
-    doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}`, 14, y);
+    y += 18;
+    doc.setFontSize(9); doc.setTextColor(120);
+    doc.text(`Total repetidas: ${this.col.repeatedCount()}   ·   ${new Date().toLocaleDateString('es-CR')}`, 14, y);
     y += 12;
 
     if (repIds.length === 0) {
-      doc.setFontSize(12);
-      doc.setTextColor(80);
+      doc.setFontSize(12); doc.setTextColor(100);
       doc.text('¡No tenés postales repetidas aún!', 14, y);
     } else {
-      // Group by team
-      const allStickersById = new Map<string, Sticker>();
-      FWC_STICKERS.forEach(s => allStickersById.set(s.id, s));
-      TEAMS.forEach(t => t.stickers.forEach(s => allStickersById.set(s.id, s)));
-      COCA_STICKERS.forEach(s => allStickersById.set(s.id, s));
+      // FWC
+      const fwcRep = FWC_STICKERS.filter(s => repMap[s.id] > 0);
+      if (fwcRep.length) y = this.addRepList(doc, 'Sección FWC', fwcRep.map(s => ({ id: s.id, count: repMap[s.id] })), y);
 
-      const fwcRep = repIds.filter(id => id.startsWith('FWC')).map(id => allStickersById.get(id)!).filter(Boolean);
-      if (fwcRep.length) y = this.addSectionWithCount(doc, 'Sección FWC', fwcRep, repeated, y);
-
+      // Teams
       for (const team of TEAMS) {
-        const tr = repIds.filter(id => id.startsWith(team.code)).map(id => allStickersById.get(id)!).filter(Boolean);
-        if (tr.length) y = this.addSectionWithCount(doc, team.name, tr, repeated, y);
+        const tr = team.stickers.filter(s => repMap[s.id] > 0).map(s => ({ id: s.id, count: repMap[s.id] }));
+        if (tr.length) y = this.addRepList(doc, `${team.flag} ${team.name}`, tr, y);
       }
 
-      const cocaRep = repIds.filter(id => id.startsWith('CC')).map(id => allStickersById.get(id)!).filter(Boolean);
-      if (cocaRep.length) y = this.addSectionWithCount(doc, 'Coca-Cola', cocaRep, repeated, y);
+      // Coca
+      const cocaRep = COCA_STICKERS.filter(s => repMap[s.id] > 0);
+      if (cocaRep.length) y = this.addRepList(doc, '🥤 Coca-Cola', cocaRep.map(s => ({ id: s.id, count: repMap[s.id] })), y);
     }
 
-    doc.save(`panini2026_repetidas_${user}.pdf`);
+    doc.save(`urisco_repetidas_${user}.pdf`);
   }
 
   exportAll(): void {
     const doc = new jsPDF();
     const user = this.col.currentUser() ?? 'Usuario';
+    const missingIds = new Set(this.col.getMissingIds());
 
     let y = 20;
     this.addTitle(doc, `Colección Completa — ${user}`, y);
-    y += 10;
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Tengo: ${this.col.ownedCount()} | Faltan: ${this.col.missingCount()} | Progreso: ${this.col.completionPct()}%`, 14, y);
-    y += 8;
-    doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}`, 14, y);
+    y += 18;
+    doc.setFontSize(9); doc.setTextColor(120);
+    doc.text(`Tengo: ${this.col.ownedCount()} | Faltan: ${this.col.missingCount()} | ${this.col.completionPct()}%   ·   ${new Date().toLocaleDateString('es-CR')}`, 14, y);
     y += 12;
 
-    const missingIds = new Set(this.col.getMissingIds());
+    // FWC
+    const fwcOwned   = FWC_STICKERS.filter(s => !missingIds.has(s.id)).map(s => s.id);
+    const fwcMissing = FWC_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
+    y = this.checkPageBreak(doc, y, 20);
+    doc.setFontSize(10); doc.setTextColor(20); doc.setFont('helvetica','bold');
+    doc.text(`Sección FWC — ${fwcOwned.length}/20`, 14, y); y += 6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    if (fwcMissing.length) { doc.setTextColor(180,30,30); doc.text('Faltan: ' + fwcMissing.join('  '), 14, y, { maxWidth: 182 }); y += 5; }
+    if (fwcOwned.length)   { doc.setTextColor(30,130,60); doc.text('Tengo:  ' + fwcOwned.join('  '), 14, y, { maxWidth: 182 }); y += 8; }
 
     for (const team of TEAMS) {
-      const owned = team.stickers.filter(s => !missingIds.has(s.id));
-      const missing = team.stickers.filter(s => missingIds.has(s.id));
-      y = this.checkPageBreak(doc, y, 30);
-      doc.setFontSize(11);
-      doc.setTextColor(20);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${team.name} — ${owned.length}/20`, 14, y);
-      y += 7;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      if (missing.length > 0) {
-        doc.setTextColor(180, 30, 30);
-        doc.text('Faltan: ' + missing.map(s => s.id).join(', '), 14, y, { maxWidth: 182 });
-        y += 6;
-      }
-      if (owned.length > 0) {
-        doc.setTextColor(30, 130, 60);
-        doc.text('Tengo: ' + owned.map(s => s.id).join(', '), 14, y, { maxWidth: 182 });
-        y += 8;
-      }
-      y += 2;
+      const owned   = team.stickers.filter(s => !missingIds.has(s.id)).map(s => s.id);
+      const missing = team.stickers.filter(s =>  missingIds.has(s.id)).map(s => s.id);
+      y = this.checkPageBreak(doc, y, 20);
+      doc.setFontSize(10); doc.setTextColor(20); doc.setFont('helvetica','bold');
+      doc.text(`${team.name} — ${owned.length}/20`, 14, y); y += 6;
+      doc.setFont('helvetica','normal'); doc.setFontSize(8);
+      if (missing.length) { doc.setTextColor(180,30,30); doc.text('Faltan: ' + missing.join('  '), 14, y, { maxWidth: 182 }); y += 5; }
+      if (owned.length)   { doc.setTextColor(30,130,60); doc.text('Tengo:  ' + owned.join('  '), 14, y, { maxWidth: 182 }); y += 8; }
     }
 
-    doc.save(`panini2026_coleccion_${user}.pdf`);
-  }
-
-  // ── Helpers ──────────────────────────────────
-  private addTitle(doc: jsPDF, title: string, y: number): void {
-    doc.setFontSize(18);
-    doc.setTextColor(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('🏆 Álbum Panini — Mundial 2026', 14, y);
-    doc.setFontSize(13);
-    doc.setTextColor(60);
-    doc.setFont('helvetica', 'normal');
-    doc.text(title, 14, y + 8);
-  }
-
-  private addSection(doc: jsPDF, title: string, stickers: Sticker[], y: number): number {
+    // Coca
+    const cocaOwned   = COCA_STICKERS.filter(s => !missingIds.has(s.id)).map(s => s.id);
+    const cocaMissing = COCA_STICKERS.filter(s =>  missingIds.has(s.id)).map(s => s.id);
     y = this.checkPageBreak(doc, y, 20);
-    doc.setFontSize(11);
-    doc.setTextColor(30, 80, 160);
-    doc.setFont('helvetica', 'bold');
-    doc.text(title, 14, y);
-    y += 6;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(50);
-    const line = stickers.map(s => `${s.id}: ${s.name}`).join('  |  ');
+    doc.setFontSize(10); doc.setTextColor(20); doc.setFont('helvetica','bold');
+    doc.text(`Coca-Cola — ${cocaOwned.length}/14`, 14, y); y += 6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    if (cocaMissing.length) { doc.setTextColor(180,30,30); doc.text('Faltan: ' + cocaMissing.join('  '), 14, y, { maxWidth: 182 }); y += 5; }
+    if (cocaOwned.length)   { doc.setTextColor(30,130,60); doc.text('Tengo:  ' + cocaOwned.join('  '), 14, y, { maxWidth: 182 }); y += 8; }
+
+    doc.save(`urisco_coleccion_${user}.pdf`);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
+  private addTitle(doc: jsPDF, subtitle: string, y: number): void {
+    doc.setFontSize(16); doc.setTextColor(20); doc.setFont('helvetica','bold');
+    doc.text('URISCO · PANINI Mundial 2026', 14, y);
+    doc.setFontSize(11); doc.setTextColor(80); doc.setFont('helvetica','normal');
+    doc.text(subtitle, 14, y + 8);
+  }
+
+  private addIdList(doc: jsPDF, title: string, ids: string[], y: number): number {
+    y = this.checkPageBreak(doc, y, 16);
+    doc.setFontSize(10); doc.setTextColor(30,80,160); doc.setFont('helvetica','bold');
+    doc.text(title, 14, y); y += 5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(50);
+    const lines = doc.splitTextToSize(ids.join('   '), 182);
+    lines.forEach((l: string) => {
+      y = this.checkPageBreak(doc, y, 6);
+      doc.text(l, 14, y); y += 5;
+    });
+    return y + 3;
+  }
+
+  private addRepList(doc: jsPDF, title: string, items: { id: string; count: number }[], y: number): number {
+    y = this.checkPageBreak(doc, y, 16);
+    doc.setFontSize(10); doc.setTextColor(30,80,160); doc.setFont('helvetica','bold');
+    doc.text(title, 14, y); y += 5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(50);
+    const line = items.map(i => `${i.id} ×${i.count}`).join('   ');
     const lines = doc.splitTextToSize(line, 182);
     lines.forEach((l: string) => {
-      y = this.checkPageBreak(doc, y, 8);
-      doc.text(l, 14, y);
-      y += 5;
-    });
-    y += 3;
-    return y;
-  }
-
-  private addSectionWithCount(doc: jsPDF, title: string, stickers: Sticker[], repeated: Record<string, number>, y: number): number {
-    y = this.checkPageBreak(doc, y, 20);
-    doc.setFontSize(11);
-    doc.setTextColor(30, 80, 160);
-    doc.setFont('helvetica', 'bold');
-    doc.text(title, 14, y);
-    y += 6;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(50);
-    stickers.forEach(s => {
       y = this.checkPageBreak(doc, y, 6);
-      doc.text(`${s.id}: ${s.name}  → x${repeated[s.id]}`, 18, y);
-      y += 5;
+      doc.text(l, 14, y); y += 5;
     });
-    y += 3;
-    return y;
+    return y + 3;
   }
 
   private checkPageBreak(doc: jsPDF, y: number, needed: number): number {
