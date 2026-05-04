@@ -179,14 +179,22 @@ export class PdfService {
     y = this.pg(doc, y, 14);
     doc.setFillColor(235, 245, 255);
     doc.rect(13, y - 4, 184, 7, 'F');
-    doc.setFontSize(8); doc.setTextColor(40,80,160); doc.setFont('helvetica','bold');
+    doc.setFontSize(9); doc.setTextColor(40,80,160); doc.setFont('helvetica','bold');
     doc.text(title, 15, y);
     y += 6;
-    doc.setFont('helvetica','normal'); doc.setTextColor(50);
-    for (const chunk of this.chunks(items, 14)) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    for (const item of items) {
+      const dashIdx = item.lastIndexOf('x');
+      const id    = item.substring(0, dashIdx);
+      const count = parseInt(item.substring(dashIdx + 1));
       y = this.pg(doc, y, 5);
-      doc.text(chunk.join('   '), 15, y);
-      y += 5;
+      doc.setTextColor(30, 30, 120);
+      doc.setFont('helvetica','bold');
+      doc.text(id, 20, y);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(60);
+      doc.text('->  ' + count + (count === 1 ? ' repetida' : ' repetidas'), 58, y);
+      y += 5.5;
     }
     return y + 2;
   }
