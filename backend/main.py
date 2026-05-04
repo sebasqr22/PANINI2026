@@ -1,9 +1,11 @@
-import sqlite3
 import json
 import os
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Optional
 
+import psycopg2
+import psycopg2.extras
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -11,66 +13,76 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
-# ─────────────────────────────────────────────────────────────
-# CONFIG
-# ─────────────────────────────────────────────────────────────
+# ── Config ────────────────────────────────────────────────────
 SECRET_KEY = os.environ.get("SECRET_KEY", "panini2026-dev-secret-change-in-prod")
-ALGORITHM = "HS256"
+ALGORITHM  = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 72
-DB_PATH = os.environ.get("DB_PATH", "panini.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context   = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-app = FastAPI(title="Álbum Panini 2026 API", version="1.0.0")
-
+app = FastAPI(title="Álbum Panini 2026 API", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # restrict to your domain in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ─────────────────────────────────────────────────────────────
-# DATABASE
-# ─────────────────────────────────────────────────────────────
+# ── Database ──────────────────────────────────────────────────
+@contextmanager
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL no está configurado")
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
+def get_db_dep():
+    with get_db() as conn:
+        yield conn
+
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            username    TEXT    UNIQUE NOT NULL,
-            password    TEXT    NOT NULL,
-            created_at  TEXT    NOT NULL
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS collections (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id      INTEGER NOT NULL REFERENCES users(id),
-            owned        TEXT    NOT NULL DEFAULT '{}',
-            repeated     TEXT    NOT NULL DEFAULT '{}',
-            updated_at   TEXT    NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
+    if not DATABASE_URL:
+        print("WARNING: DATABASE_URL no configurado, saltando init")
+        return
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id         SERIAL PRIMARY KEY,
+                username   TEXT UNIQUE NOT NULL,
+                password   TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS collections (
+                id         SERIAL PRIMARY KEY,
+                user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                owned      JSONB NOT NULL DEFAULT '{}',
+                repeated   JSONB NOT NULL DEFAULT '{}',
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE(user_id)
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_col_user ON collections(user_id)")
 
-init_db()
+try:
+    init_db()
+    print("✅ Base de datos lista")
+except Exception as e:
+    print(f"⚠️  DB init: {e}")
 
-# ─────────────────────────────────────────────────────────────
-# SCHEMAS
-# ─────────────────────────────────────────────────────────────
+# ── Schemas ───────────────────────────────────────────────────
 class UserRegister(BaseModel):
     username: str
     password: str
@@ -81,188 +93,138 @@ class Token(BaseModel):
     username: str
 
 class CollectionData(BaseModel):
-    owned: dict[str, bool]
+    owned:    dict[str, bool]
     repeated: dict[str, int]
 
 class StickerUpdate(BaseModel):
     sticker_id: str
-    owned: Optional[bool] = None
-    repeated: Optional[int] = None
+    owned:    Optional[bool] = None
+    repeated: Optional[int]  = None
 
-# ─────────────────────────────────────────────────────────────
-# AUTH HELPERS
-# ─────────────────────────────────────────────────────────────
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+# ── Auth helpers ──────────────────────────────────────────────
+def hash_password(p: str) -> str:
+    return pwd_context.hash(p)
 
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
-def create_access_token(data: dict) -> str:
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
-    to_encode["exp"] = expire
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+def create_token(username: str) -> str:
+    payload = {"sub": username, "exp": datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Token inválido o expirado",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db_dep)):
+    exc = HTTPException(status_code=401, detail="Token inválido o expirado",
+                        headers={"WWW-Authenticate": "Bearer"})
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
+        payload  = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username: raise exc
     except JWTError:
-        raise credentials_exception
-
-    user = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-    if user is None:
-        raise credentials_exception
+        raise exc
+    cur = db.cursor()
+    cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+    user = cur.fetchone()
+    if not user: raise exc
     return user
 
-def get_or_create_collection(user_id: int, db) -> dict:
-    row = db.execute("SELECT * FROM collections WHERE user_id = ?", (user_id,)).fetchone()
-    if row is None:
-        now = datetime.utcnow().isoformat()
-        db.execute(
-            "INSERT INTO collections (user_id, owned, repeated, updated_at) VALUES (?, '{}', '{}', ?)",
-            (user_id, now)
-        )
-        db.commit()
-        return {"owned": {}, "repeated": {}}
-    return {"owned": json.loads(row["owned"]), "repeated": json.loads(row["repeated"])}
+def upsert_collection(user_id: int, owned: dict, repeated: dict, db):
+    db.cursor().execute("""
+        INSERT INTO collections (user_id, owned, repeated, updated_at)
+        VALUES (%s, %s, %s, NOW())
+        ON CONFLICT (user_id)
+        DO UPDATE SET owned = EXCLUDED.owned, repeated = EXCLUDED.repeated, updated_at = NOW()
+    """, (user_id, json.dumps(owned), json.dumps(repeated)))
 
-# ─────────────────────────────────────────────────────────────
-# AUTH ROUTES
-# ─────────────────────────────────────────────────────────────
+def fetch_collection(user_id: int, db) -> dict:
+    cur = db.cursor()
+    cur.execute("SELECT owned, repeated FROM collections WHERE user_id = %s", (user_id,))
+    row = cur.fetchone()
+    if not row:
+        upsert_collection(user_id, {}, {}, db)
+        return {"owned": {}, "repeated": {}}
+    return {"owned": dict(row["owned"]), "repeated": dict(row["repeated"])}
+
+# ── Auth routes ───────────────────────────────────────────────
 @app.post("/auth/register", response_model=Token, status_code=201)
-def register(data: UserRegister, db=Depends(get_db)):
+def register(data: UserRegister, db=Depends(get_db_dep)):
     if len(data.username.strip()) < 2:
         raise HTTPException(400, "El nombre debe tener al menos 2 caracteres")
     if len(data.password) < 4:
         raise HTTPException(400, "La contraseña debe tener al menos 4 caracteres")
-
-    existing = db.execute("SELECT id FROM users WHERE username = ?", (data.username.strip(),)).fetchone()
-    if existing:
+    cur = db.cursor()
+    cur.execute("SELECT id FROM users WHERE username = %s", (data.username.strip(),))
+    if cur.fetchone():
         raise HTTPException(400, "Ese nombre de usuario ya está en uso")
-
-    hashed = hash_password(data.password)
-    now = datetime.utcnow().isoformat()
-    db.execute(
-        "INSERT INTO users (username, password, created_at) VALUES (?, ?, ?)",
-        (data.username.strip(), hashed, now)
-    )
-    db.commit()
-
-    token = create_access_token({"sub": data.username.strip()})
-    return {"access_token": token, "token_type": "bearer", "username": data.username.strip()}
-
+    cur.execute("INSERT INTO users (username, password) VALUES (%s, %s)",
+                (data.username.strip(), hash_password(data.password)))
+    return {"access_token": create_token(data.username.strip()),
+            "token_type": "bearer", "username": data.username.strip()}
 
 @app.post("/auth/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get_db)):
-    user = db.execute("SELECT * FROM users WHERE username = ?", (form_data.username,)).fetchone()
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get_db_dep)):
+    cur = db.cursor()
+    cur.execute("SELECT * FROM users WHERE username = %s", (form_data.username,))
+    user = cur.fetchone()
     if not user or not verify_password(form_data.password, user["password"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario o contraseña incorrectos",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    token = create_access_token({"sub": user["username"]})
-    return {"access_token": token, "token_type": "bearer", "username": user["username"]}
-
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos",
+                            headers={"WWW-Authenticate": "Bearer"})
+    return {"access_token": create_token(user["username"]),
+            "token_type": "bearer", "username": user["username"]}
 
 @app.get("/auth/me")
-def me(current_user=Depends(get_current_user)):
-    return {"id": current_user["id"], "username": current_user["username"], "created_at": current_user["created_at"]}
+def me(u=Depends(get_current_user)):
+    return {"id": u["id"], "username": u["username"], "created_at": str(u["created_at"])}
 
-# ─────────────────────────────────────────────────────────────
-# COLLECTION ROUTES
-# ─────────────────────────────────────────────────────────────
+# ── Collection routes ─────────────────────────────────────────
 @app.get("/collection")
-def get_collection(current_user=Depends(get_current_user), db=Depends(get_db)):
-    """Get the full collection for the current user."""
-    data = get_or_create_collection(current_user["id"], db)
-    return data
-
+def get_collection(u=Depends(get_current_user), db=Depends(get_db_dep)):
+    return fetch_collection(u["id"], db)
 
 @app.put("/collection")
-def replace_collection(data: CollectionData, current_user=Depends(get_current_user), db=Depends(get_db)):
-    """Replace the entire collection (bulk sync)."""
-    now = datetime.utcnow().isoformat()
-    existing = db.execute("SELECT id FROM collections WHERE user_id = ?", (current_user["id"],)).fetchone()
-    if existing:
-        db.execute(
-            "UPDATE collections SET owned = ?, repeated = ?, updated_at = ? WHERE user_id = ?",
-            (json.dumps(data.owned), json.dumps(data.repeated), now, current_user["id"])
-        )
-    else:
-        db.execute(
-            "INSERT INTO collections (user_id, owned, repeated, updated_at) VALUES (?, ?, ?, ?)",
-            (current_user["id"], json.dumps(data.owned), json.dumps(data.repeated), now)
-        )
-    db.commit()
-    return {"ok": True, "updated_at": now}
-
+def replace_collection(data: CollectionData, u=Depends(get_current_user), db=Depends(get_db_dep)):
+    upsert_collection(u["id"], data.owned, data.repeated, db)
+    return {"ok": True}
 
 @app.patch("/collection/sticker")
-def update_sticker(update: StickerUpdate, current_user=Depends(get_current_user), db=Depends(get_db)):
-    """Update a single sticker's owned/repeated status (efficient incremental update)."""
-    col = get_or_create_collection(current_user["id"], db)
-    owned = col["owned"]
+def update_sticker(upd: StickerUpdate, u=Depends(get_current_user), db=Depends(get_db_dep)):
+    col      = fetch_collection(u["id"], db)
+    owned    = col["owned"]
     repeated = col["repeated"]
+    sid      = upd.sticker_id
 
-    sid = update.sticker_id
-
-    if update.owned is not None:
-        if update.owned:
+    if upd.owned is not None:
+        if upd.owned:
             owned[sid] = True
         else:
             owned.pop(sid, None)
             repeated.pop(sid, None)
 
-    if update.repeated is not None:
-        if update.repeated > 0:
-            owned[sid] = True
-            repeated[sid] = update.repeated
+    if upd.repeated is not None:
+        if upd.repeated > 0:
+            owned[sid]    = True
+            repeated[sid] = upd.repeated
         else:
             repeated.pop(sid, None)
 
-    now = datetime.utcnow().isoformat()
-    existing = db.execute("SELECT id FROM collections WHERE user_id = ?", (current_user["id"],)).fetchone()
-    if existing:
-        db.execute(
-            "UPDATE collections SET owned = ?, repeated = ?, updated_at = ? WHERE user_id = ?",
-            (json.dumps(owned), json.dumps(repeated), now, current_user["id"])
-        )
-    else:
-        db.execute(
-            "INSERT INTO collections (user_id, owned, repeated, updated_at) VALUES (?, ?, ?, ?)",
-            (current_user["id"], json.dumps(owned), json.dumps(repeated), now)
-        )
-    db.commit()
-    return {"ok": True, "sticker_id": sid, "owned": owned.get(sid, False), "repeated": repeated.get(sid, 0)}
-
+    upsert_collection(u["id"], owned, repeated, db)
+    return {"ok": True, "sticker_id": sid,
+            "owned": owned.get(sid, False), "repeated": repeated.get(sid, 0)}
 
 @app.get("/collection/stats")
-def get_stats(current_user=Depends(get_current_user), db=Depends(get_db)):
-    """Quick stats without sending the full collection."""
-    col = get_or_create_collection(current_user["id"], db)
-    owned_base = {k: v for k, v in col["owned"].items() if not k.startswith("CC")}
-    owned_coca = {k: v for k, v in col["owned"].items() if k.startswith("CC")}
-    total_repeated = sum(col["repeated"].values())
+def get_stats(u=Depends(get_current_user), db=Depends(get_db_dep)):
+    col = fetch_collection(u["id"], db)
     return {
-        "owned_base": len(owned_base),
-        "owned_coca": len(owned_coca),
-        "total_repeated": total_repeated,
+        "owned_base":     len([k for k in col["owned"] if not k.startswith("CC")]),
+        "owned_coca":     len([k for k in col["owned"] if k.startswith("CC")]),
+        "total_repeated": sum(col["repeated"].values()),
     }
 
-
-# ─────────────────────────────────────────────────────────────
-# HEALTH
-# ─────────────────────────────────────────────────────────────
+# ── Health ────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "panini2026-api"}
+    try:
+        with get_db() as conn:
+            conn.cursor().execute("SELECT 1")
+        return {"status": "ok", "db": True}
+    except Exception as e:
+        return {"status": "error", "db": False, "detail": str(e)}
