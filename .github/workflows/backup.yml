@@ -1,0 +1,39 @@
+name: Database Backup
+
+on:
+  schedule:
+    - cron: '0 6,18 * * *'   # 6am y 6pm UTC (= 1am y 1pm Costa Rica)
+  workflow_dispatch:           # permite correrlo manualmente también
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # necesario para hacer push al repo
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary
+
+      - name: Run backup
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/backup_db.py
+
+      - name: Commit and push backup
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backups/
+          git diff --staged --quiet || git commit -m "backup: $(date -u '+%Y-%m-%d %H:%M') UTC"
+          git push
