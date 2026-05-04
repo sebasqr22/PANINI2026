@@ -1,147 +1,105 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { UserCollection } from '../models/sticker.model';
+import { ApiService } from './api.service';
 import { TEAMS, FWC_STICKERS, COCA_STICKERS } from '../models/album-data';
-
-const STORAGE_KEY = 'panini2026_collections';
 
 @Injectable({ providedIn: 'root' })
 export class CollectionService {
   private readonly allBaseIds: string[] = [
-    ...FWC_STICKERS.map(s => s.id),
-    ...TEAMS.flatMap(t => t.stickers.map(s => s.id)),
+    ...FWC_STICKERS.map((s: any) => s.id),
+    ...TEAMS.flatMap((t: any) => t.stickers.map((s: any) => s.id)),
   ];
-  private readonly allCocaIds: string[] = COCA_STICKERS.map(s => s.id);
-  readonly allIds = [...this.allBaseIds, ...this.allCocaIds];
-  readonly totalBase = this.allBaseIds.length;        // 980
-  readonly totalCoca = this.allCocaIds.length;        // 14
-  readonly totalAll = this.allIds.length;             // 994
+  private readonly allCocaIds: string[] = COCA_STICKERS.map((s: any) => s.id);
 
-  private _currentUser = signal<string | null>(null);
-  private _collection = signal<UserCollection | null>(null);
+  readonly totalBase = this.allBaseIds.length;
+  readonly totalCoca = this.allCocaIds.length;
 
-  readonly currentUser = this._currentUser.asReadonly();
-  readonly collection = this._collection.asReadonly();
+  readonly currentUser = computed(() => this.api.storedUsername());
+  readonly isLoggedIn  = computed(() => !!this.api.token());
 
-  readonly ownedCount = computed(() => {
-    const col = this._collection();
-    if (!col) return 0;
-    return Object.keys(col.owned).filter(k => col.owned[k] && this.allBaseIds.includes(k)).length;
-  });
+  private _owned    = signal<Record<string, boolean>>({});
+  private _repeated = signal<Record<string, number>>({});
+  private _loading  = signal(false);
+  private _syncing  = signal(false);
 
-  readonly cocaOwnedCount = computed(() => {
-    const col = this._collection();
-    if (!col) return 0;
-    return Object.keys(col.owned).filter(k => col.owned[k] && this.allCocaIds.includes(k)).length;
-  });
+  readonly loading  = this._loading.asReadonly();
+  readonly syncing  = this._syncing.asReadonly();
 
-  readonly missingCount = computed(() => this.totalBase - this.ownedCount());
-
-  readonly repeatedCount = computed(() => {
-    const col = this._collection();
-    if (!col) return 0;
-    return Object.values(col.repeated).reduce((a, b) => a + b, 0);
-  });
-
-  readonly completionPct = computed(() =>
-    Math.round((this.ownedCount() / this.totalBase) * 100)
+  readonly ownedCount = computed(() =>
+    Object.keys(this._owned()).filter(k => (this._owned() as any)[k] && this.allBaseIds.includes(k)).length
   );
+  readonly cocaOwnedCount = computed(() =>
+    Object.keys(this._owned()).filter(k => (this._owned() as any)[k] && this.allCocaIds.includes(k)).length
+  );
+  readonly missingCount  = computed(() => this.totalBase - this.ownedCount());
+  readonly repeatedCount = computed(() => Object.values(this._repeated()).reduce((a, b) => a + b, 0));
+  readonly completionPct = computed(() => Math.round((this.ownedCount() / this.totalBase) * 100));
 
-  // ── User management ─────────────────────────
-  getSavedUsers(): string[] {
-    const data = this.loadStorage();
-    return Object.keys(data);
+  constructor(private api: ApiService) {
+    if (this.api.token()) this.loadCollection();
   }
 
-  login(username: string): boolean {
-    if (!username.trim()) return false;
-    const name = username.trim();
-    const data = this.loadStorage();
-    if (!data[name]) {
-      data[name] = this.emptyCollection(name);
-      this.saveStorage(data);
-    }
-    this._currentUser.set(name);
-    this._collection.set(data[name]);
-    return true;
+  async register(username: string, password: string): Promise<void> {
+    await this.api.register(username, password);
+    await this.loadCollection();
+  }
+
+  async login(username: string, password: string): Promise<void> {
+    await this.api.login(username, password);
+    await this.loadCollection();
   }
 
   logout() {
-    this._currentUser.set(null);
-    this._collection.set(null);
+    this.api.logout();
+    this._owned.set({});
+    this._repeated.set({});
   }
 
-  // ── Sticker operations ───────────────────────
-  toggleOwned(stickerId: string): void {
-    this.mutate(col => {
-      if (col.owned[stickerId]) {
-        delete col.owned[stickerId];
-        delete col.repeated[stickerId];
-      } else {
-        col.owned[stickerId] = true;
-      }
-    });
+  async loadCollection(): Promise<void> {
+    this._loading.set(true);
+    try {
+      const data = await this.api.getCollection();
+      this._owned.set(data.owned ?? {});
+      this._repeated.set(data.repeated ?? {});
+    } catch (e) {
+      console.error('Error loading collection', e);
+    } finally {
+      this._loading.set(false);
+    }
   }
 
-  setOwned(stickerId: string, owned: boolean): void {
-    this.mutate(col => {
-      if (owned) col.owned[stickerId] = true;
-      else { delete col.owned[stickerId]; delete col.repeated[stickerId]; }
-    });
+  isOwned(id: string): boolean { return !!(this._owned() as any)[id]; }
+  getRepeated(id: string): number { return (this._repeated() as any)[id] ?? 0; }
+
+  async setOwned(id: string, owned: boolean): Promise<void> {
+    if (owned) {
+      this._owned.update(o => ({ ...o, [id]: true }));
+    } else {
+      this._owned.update(o => { const n = { ...o }; delete (n as any)[id]; return n; });
+      this._repeated.update(r => { const n = { ...r }; delete (n as any)[id]; return n; });
+    }
+    this._syncing.set(true);
+    try { await this.api.updateSticker(id, owned); }
+    catch (e) { console.error('Sync error', e); await this.loadCollection(); }
+    finally { this._syncing.set(false); }
   }
 
-  setRepeated(stickerId: string, count: number): void {
-    this.mutate(col => {
-      if (count > 0) {
-        col.owned[stickerId] = true;
-        col.repeated[stickerId] = count;
-      } else {
-        delete col.repeated[stickerId];
-      }
-    });
-  }
-
-  isOwned(stickerId: string): boolean {
-    return !!this._collection()?.owned[stickerId];
-  }
-
-  getRepeated(stickerId: string): number {
-    return this._collection()?.repeated[stickerId] ?? 0;
+  async setRepeated(id: string, count: number): Promise<void> {
+    if (count > 0) {
+      this._owned.update(o => ({ ...o, [id]: true }));
+      this._repeated.update(r => ({ ...r, [id]: count }));
+    } else {
+      this._repeated.update(r => { const n = { ...r }; delete (n as any)[id]; return n; });
+    }
+    this._syncing.set(true);
+    try { await this.api.updateSticker(id, undefined, count); }
+    catch (e) { console.error('Sync error', e); await this.loadCollection(); }
+    finally { this._syncing.set(false); }
   }
 
   getMissingIds(): string[] {
-    const col = this._collection();
-    if (!col) return [];
-    return this.allBaseIds.filter(id => !col.owned[id]);
+    const o = this._owned();
+    return this.allBaseIds.filter(id => !(o as any)[id]);
   }
 
-  getRepeatedMap(): Record<string, number> {
-    return this._collection()?.repeated ?? {};
-  }
-
-  // ── Internals ────────────────────────────────
-  private mutate(fn: (col: UserCollection) => void): void {
-    const col = this._collection();
-    const user = this._currentUser();
-    if (!col || !user) return;
-    const updated = { ...col, owned: { ...col.owned }, repeated: { ...col.repeated }, lastUpdated: new Date().toISOString() };
-    fn(updated);
-    this._collection.set(updated);
-    const data = this.loadStorage();
-    data[user] = updated;
-    this.saveStorage(data);
-  }
-
-  private emptyCollection(username: string): UserCollection {
-    return { username, owned: {}, repeated: {}, lastUpdated: new Date().toISOString() };
-  }
-
-  private loadStorage(): Record<string, UserCollection> {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
-    } catch { return {}; }
-  }
-
-  private saveStorage(data: Record<string, UserCollection>): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }
+  getRepeatedMap(): Record<string, number> { return this._repeated(); }
 }
