@@ -103,25 +103,25 @@ export class PdfService {
       lines.push('FALTAN (' + this.col.missingCount() + ')');
       lines.push('');
       const fwcM = FWC_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
-      if (fwcM.length) { lines.push('*Seccion FWC*'); lines.push(fwcM.join(' - ')); lines.push(''); }
+      if (fwcM.length) { lines.push('*Seccion FWC*'); lines.push(fwcM.join('  |  ')); lines.push(''); }
       for (const team of TEAMS) {
         const ids = team.stickers.filter(s => missingIds.has(s.id)).map(s => s.id);
-        if (ids.length) { lines.push('*' + team.name + '* (' + ids.length + ')'); lines.push(ids.join(' - ')); lines.push(''); }
+        if (ids.length) { lines.push('*' + team.name + '* (' + ids.length + ')'); lines.push(ids.join('  |  ')); lines.push(''); }
       }
       const cocaM = COCA_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
-      if (cocaM.length) { lines.push('*Coca-Cola*'); lines.push(cocaM.join(' - ')); }
+      if (cocaM.length) { lines.push('*Coca-Cola*'); lines.push(cocaM.join('  |  ')); }
 
     } else if (type === 'repeated') {
       lines.push('REPETIDAS (' + this.col.repeatedCount() + ')');
       lines.push('');
       const fwcR = FWC_STICKERS.filter(s => (repMap[s.id] ?? 0) > 0);
-      if (fwcR.length) { lines.push('*Seccion FWC*'); lines.push(fwcR.map(s => s.id + 'x' + repMap[s.id]).join(' - ')); lines.push(''); }
+      if (fwcR.length) { lines.push('*Seccion FWC*'); lines.push(fwcR.map(s => s.id + ' (×' + repMap[s.id] + ')').join('  |  ')); lines.push(''); }
       for (const team of TEAMS) {
         const tr = team.stickers.filter(s => (repMap[s.id] ?? 0) > 0);
-        if (tr.length) { lines.push('*' + team.name + '*'); lines.push(tr.map(s => s.id + 'x' + repMap[s.id]).join(' - ')); lines.push(''); }
+        if (tr.length) { lines.push('*' + team.name + '*'); lines.push(tr.map(s => s.id + ' (×' + repMap[s.id] + ')').join('  |  ')); lines.push(''); }
       }
       const cocaR = COCA_STICKERS.filter(s => (repMap[s.id] ?? 0) > 0);
-      if (cocaR.length) { lines.push('*Coca-Cola*'); lines.push(cocaR.map(s => s.id + 'x' + repMap[s.id]).join(' - ')); }
+      if (cocaR.length) { lines.push('*Coca-Cola*'); lines.push(cocaR.map(s => s.id + ' (×' + repMap[s.id] + ')').join('  |  ')); }
 
     } else {
       lines.push('RESUMEN: ' + this.col.ownedCount() + '/' + this.col.totalBase + ' (' + this.col.completionPct() + '%)');
@@ -131,7 +131,7 @@ export class PdfService {
       for (const team of TEAMS) {
         const owned = team.stickers.filter(s => !missingIds.has(s.id));
         if (owned.length > 0)
-          lines.push(team.name + ': ' + owned.length + '/20 -> ' + owned.map(s => s.id).join(' - '));
+          lines.push(team.name + ': ' + owned.length + '/20  →  ' + owned.map(s => s.id).join('  |  '));
       }
     }
     return lines.join('\n');
