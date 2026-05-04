@@ -1,5 +1,6 @@
 import json
 import os
+import bcrypt
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Optional, Dict
@@ -10,22 +11,20 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from pydantic import BaseModel
 
 # ── Config ────────────────────────────────────────────────────
-SECRET_KEY = os.environ.get("SECRET_KEY", "panini2026-dev-secret-change-in-prod")
-ALGORITHM  = "HS256"
+SECRET_KEY   = os.environ.get("SECRET_KEY", "panini2026-dev-secret-change-in-prod")
+ALGORITHM    = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 72
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-pwd_context   = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 app = FastAPI(title="Álbum Panini 2026 API", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://panini2026-app.onrender.com", "http://localhost:4200", "http://localhost:3000"],
+    allow_origins=["https://panini2026-app.onrender.com", "http://localhost:4200"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,7 +51,7 @@ def get_db_dep():
 
 def init_db():
     if not DATABASE_URL:
-        print("WARNING: DATABASE_URL no configurado, saltando init")
+        print("WARNING: DATABASE_URL no configurado", flush=True)
         return
     with get_db() as conn:
         cur = conn.cursor()
@@ -78,9 +77,9 @@ def init_db():
 
 try:
     init_db()
-    print("✅ Base de datos lista")
+    print("✅ Base de datos lista", flush=True)
 except Exception as e:
-    print(f"⚠️  DB init: {e}")
+    print(f"⚠️  DB init: {e}", flush=True)
 
 # ── Schemas ───────────────────────────────────────────────────
 class UserRegister(BaseModel):
@@ -102,11 +101,11 @@ class StickerUpdate(BaseModel):
     repeated: Optional[int]  = None
 
 # ── Auth helpers ──────────────────────────────────────────────
-def hash_password(p: str) -> str:
-    return pwd_context.hash(p)
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 def create_token(username: str) -> str:
     payload = {"sub": username, "exp": datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)}
@@ -191,21 +190,18 @@ def update_sticker(upd: StickerUpdate, u=Depends(get_current_user), db=Depends(g
     owned    = col["owned"]
     repeated = col["repeated"]
     sid      = upd.sticker_id
-
     if upd.owned is not None:
         if upd.owned:
             owned[sid] = True
         else:
             owned.pop(sid, None)
             repeated.pop(sid, None)
-
     if upd.repeated is not None:
         if upd.repeated > 0:
             owned[sid]    = True
             repeated[sid] = upd.repeated
         else:
             repeated.pop(sid, None)
-
     upsert_collection(u["id"], owned, repeated, db)
     return {"ok": True, "sticker_id": sid,
             "owned": owned.get(sid, False), "repeated": repeated.get(sid, 0)}
@@ -219,7 +215,6 @@ def get_stats(u=Depends(get_current_user), db=Depends(get_db_dep)):
         "total_repeated": sum(col["repeated"].values()),
     }
 
-# ── Health ────────────────────────────────────────────────────
 @app.get("/health")
 def health():
     try:
