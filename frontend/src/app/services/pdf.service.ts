@@ -9,300 +9,232 @@ const MASCOTA_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAIAAAC2BqGFAABCZElEQVR4nN2
 export class PdfService {
   constructor(private col: CollectionService) {}
 
-  // ── PDF: Solo Faltantes ───────────────────────────────────
   exportMissing(): void {
     const doc = new jsPDF();
     const user = this.col.currentUser() ?? 'Usuario';
     const missingIds = new Set(this.col.getMissingIds());
-    let y = this.addHeader(doc, 'Postales Faltantes', user);
-
+    let y = this.header(doc, 'Postales Faltantes', user);
     doc.setFontSize(9); doc.setTextColor(120);
-    doc.text(`Faltan: ${this.col.missingCount()} de ${this.col.totalBase}   ·   ${this.today()}`, 14, y);
+    doc.text('Faltan: ' + this.col.missingCount() + ' de ' + this.col.totalBase + '   -   ' + this.today(), 14, y);
     y += 10;
 
-    const fwcMissing = FWC_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
-    if (fwcMissing.length) y = this.addBlock(doc, 'Sección FWC', fwcMissing, y, '#1a3a6b');
+    const fwcM = FWC_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
+    if (fwcM.length) y = this.block(doc, 'Seccion FWC', fwcM, y);
 
     for (const team of TEAMS) {
       const ids = team.stickers.filter(s => missingIds.has(s.id)).map(s => s.id);
-      if (ids.length) y = this.addBlock(doc, `${team.flag} ${team.name}`, ids, y, '#1a3a6b');
+      if (ids.length) y = this.block(doc, team.name, ids, y);
     }
 
-    const cocaMissing = COCA_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
-    if (cocaMissing.length) y = this.addBlock(doc, '🥤 Coca-Cola', cocaMissing, y, '#8b0000');
+    const cocaM = COCA_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
+    if (cocaM.length) y = this.block(doc, 'Coca-Cola', cocaM, y);
 
-    doc.save(`urisco_faltantes_${user}.pdf`);
+    doc.save('urisco_faltantes_' + user + '.pdf');
   }
 
-  // ── PDF: Solo Repetidas ───────────────────────────────────
   exportRepeated(): void {
     const doc = new jsPDF();
     const user = this.col.currentUser() ?? 'Usuario';
     const repMap = this.col.getRepeatedMap();
-    let y = this.addHeader(doc, 'Postales Repetidas', user);
-
+    let y = this.header(doc, 'Postales Repetidas', user);
     doc.setFontSize(9); doc.setTextColor(120);
-    doc.text(`Total repetidas: ${this.col.repeatedCount()}   ·   ${this.today()}`, 14, y);
+    doc.text('Total repetidas: ' + this.col.repeatedCount() + '   -   ' + this.today(), 14, y);
     y += 10;
 
-    if (Object.keys(repMap).length === 0) {
-      doc.setFontSize(12); doc.setTextColor(100);
-      doc.text('No tenés postales repetidas aún.', 14, y);
+    if (Object.keys(repMap).filter(k => repMap[k] > 0).length === 0) {
+      doc.setFontSize(11); doc.setTextColor(100);
+      doc.text('No tenes postales repetidas aun.', 14, y);
     } else {
-      const fwcRep = FWC_STICKERS.filter(s => (repMap[s.id] ?? 0) > 0);
-      if (fwcRep.length) y = this.addRepBlock(doc, 'Sección FWC', fwcRep.map(s => ({ id: s.id, count: repMap[s.id] })), y);
-
+      const fwcR = FWC_STICKERS.filter(s => (repMap[s.id] ?? 0) > 0);
+      if (fwcR.length) y = this.repBlock(doc, 'Seccion FWC', fwcR.map(s => s.id + 'x' + repMap[s.id]), y);
       for (const team of TEAMS) {
-        const tr = team.stickers.filter(s => (repMap[s.id] ?? 0) > 0).map(s => ({ id: s.id, count: repMap[s.id] }));
-        if (tr.length) y = this.addRepBlock(doc, `${team.flag} ${team.name}`, tr, y);
+        const tr = team.stickers.filter(s => (repMap[s.id] ?? 0) > 0);
+        if (tr.length) y = this.repBlock(doc, team.name, tr.map(s => s.id + 'x' + repMap[s.id]), y);
       }
-
-      const cocaRep = COCA_STICKERS.filter(s => (repMap[s.id] ?? 0) > 0);
-      if (cocaRep.length) y = this.addRepBlock(doc, '🥤 Coca-Cola', cocaRep.map(s => ({ id: s.id, count: repMap[s.id] })), y);
+      const cocaR = COCA_STICKERS.filter(s => (repMap[s.id] ?? 0) > 0);
+      if (cocaR.length) y = this.repBlock(doc, 'Coca-Cola', cocaR.map(s => s.id + 'x' + repMap[s.id]), y);
     }
 
-    doc.save(`urisco_repetidas_${user}.pdf`);
+    doc.save('urisco_repetidas_' + user + '.pdf');
   }
 
-  // ── PDF: Colección Completa ───────────────────────────────
   exportAll(): void {
     const doc = new jsPDF();
     const user = this.col.currentUser() ?? 'Usuario';
     const missingIds = new Set(this.col.getMissingIds());
-    let y = this.addHeader(doc, 'Colección Completa', user);
-
+    let y = this.header(doc, 'Coleccion Completa', user);
     doc.setFontSize(9); doc.setTextColor(120);
-    doc.text(`Tengo: ${this.col.ownedCount()} | Faltan: ${this.col.missingCount()} | Progreso: ${this.col.completionPct()}%   ·   ${this.today()}`, 14, y);
+    doc.text('Tengo: ' + this.col.ownedCount() + ' | Faltan: ' + this.col.missingCount() + ' | ' + this.col.completionPct() + '%   -   ' + this.today(), 14, y);
     y += 10;
 
     // FWC
     const fwcOwned   = FWC_STICKERS.filter(s => !missingIds.has(s.id)).map(s => s.id);
     const fwcMissing = FWC_STICKERS.filter(s =>  missingIds.has(s.id)).map(s => s.id);
-    if (fwcOwned.length || fwcMissing.length) {
-      y = this.checkPage(doc, y, 18);
-      y = this.addTeamBlock(doc, 'Sección FWC', fwcOwned.length, 20, fwcOwned, fwcMissing, y);
-    }
+    if (fwcOwned.length || fwcMissing.length)
+      y = this.teamBlock(doc, 'Seccion FWC', fwcOwned.length, 20, fwcOwned, fwcMissing, y);
 
-    // Teams — solo los que tienen al menos 1 carta
     for (const team of TEAMS) {
       const owned   = team.stickers.filter(s => !missingIds.has(s.id)).map(s => s.id);
       const missing = team.stickers.filter(s =>  missingIds.has(s.id)).map(s => s.id);
-      if (owned.length > 0) {
-        y = this.checkPage(doc, y, 18);
-        y = this.addTeamBlock(doc, `${team.flag} ${team.name}`, owned.length, 20, owned, missing, y);
-      }
+      if (owned.length > 0)
+        y = this.teamBlock(doc, team.name, owned.length, 20, owned, missing, y);
     }
 
-    // Coca — solo si tiene alguna
     const cocaOwned   = COCA_STICKERS.filter(s => !missingIds.has(s.id)).map(s => s.id);
     const cocaMissing = COCA_STICKERS.filter(s =>  missingIds.has(s.id)).map(s => s.id);
-    if (cocaOwned.length > 0) {
-      y = this.checkPage(doc, y, 18);
-      y = this.addTeamBlock(doc, '🥤 Coca-Cola', cocaOwned.length, 14, cocaOwned, cocaMissing, y);
-    }
+    if (cocaOwned.length > 0)
+      y = this.teamBlock(doc, 'Coca-Cola', cocaOwned.length, 14, cocaOwned, cocaMissing, y);
 
-    doc.save(`urisco_coleccion_${user}.pdf`);
+    doc.save('urisco_coleccion_' + user + '.pdf');
   }
 
-  // ── Exportar como texto para WhatsApp ─────────────────────
+  // ── Texto para WhatsApp ───────────────────────────────────
   exportAsText(type: 'missing' | 'repeated' | 'all'): string {
     const user = this.col.currentUser() ?? 'Usuario';
     const missingIds = new Set(this.col.getMissingIds());
     const repMap = this.col.getRepeatedMap();
     const lines: string[] = [];
 
-    lines.push(`🏆 URISCO PANINI 2026 — ${user}`);
-    lines.push(`📅 ${this.today()}`);
+    lines.push('URISCO PANINI 2026 - ' + user);
+    lines.push(this.today());
     lines.push('');
 
     if (type === 'missing') {
-      lines.push(`❌ POSTALES FALTANTES (${this.col.missingCount()})`);
+      lines.push('FALTAN (' + this.col.missingCount() + ')');
       lines.push('');
-
       const fwcM = FWC_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
-      if (fwcM.length) {
-        lines.push('📋 *Sección FWC*');
-        lines.push(fwcM.join(' · '));
-        lines.push('');
-      }
-
+      if (fwcM.length) { lines.push('*Seccion FWC*'); lines.push(fwcM.join(' - ')); lines.push(''); }
       for (const team of TEAMS) {
         const ids = team.stickers.filter(s => missingIds.has(s.id)).map(s => s.id);
-        if (ids.length) {
-          lines.push(`${team.flag} *${team.name}* (${ids.length} faltan)`);
-          lines.push(ids.join(' · '));
-          lines.push('');
-        }
+        if (ids.length) { lines.push('*' + team.name + '* (' + ids.length + ')'); lines.push(ids.join(' - ')); lines.push(''); }
       }
-
       const cocaM = COCA_STICKERS.filter(s => missingIds.has(s.id)).map(s => s.id);
-      if (cocaM.length) {
-        lines.push('🥤 *Coca-Cola*');
-        lines.push(cocaM.join(' · '));
-      }
+      if (cocaM.length) { lines.push('*Coca-Cola*'); lines.push(cocaM.join(' - ')); }
 
     } else if (type === 'repeated') {
-      lines.push(`🔄 POSTALES REPETIDAS (${this.col.repeatedCount()} total)`);
+      lines.push('REPETIDAS (' + this.col.repeatedCount() + ')');
       lines.push('');
-
       const fwcR = FWC_STICKERS.filter(s => (repMap[s.id] ?? 0) > 0);
-      if (fwcR.length) {
-        lines.push('📋 *Sección FWC*');
-        lines.push(fwcR.map(s => `${s.id}×${repMap[s.id]}`).join(' · '));
-        lines.push('');
-      }
-
+      if (fwcR.length) { lines.push('*Seccion FWC*'); lines.push(fwcR.map(s => s.id + 'x' + repMap[s.id]).join(' - ')); lines.push(''); }
       for (const team of TEAMS) {
         const tr = team.stickers.filter(s => (repMap[s.id] ?? 0) > 0);
-        if (tr.length) {
-          lines.push(`${team.flag} *${team.name}*`);
-          lines.push(tr.map(s => `${s.id}×${repMap[s.id]}`).join(' · '));
-          lines.push('');
-        }
+        if (tr.length) { lines.push('*' + team.name + '*'); lines.push(tr.map(s => s.id + 'x' + repMap[s.id]).join(' - ')); lines.push(''); }
       }
-
       const cocaR = COCA_STICKERS.filter(s => (repMap[s.id] ?? 0) > 0);
-      if (cocaR.length) {
-        lines.push('🥤 *Coca-Cola*');
-        lines.push(cocaR.map(s => `${s.id}×${repMap[s.id]}`).join(' · '));
-      }
+      if (cocaR.length) { lines.push('*Coca-Cola*'); lines.push(cocaR.map(s => s.id + 'x' + repMap[s.id]).join(' - ')); }
 
     } else {
-      lines.push(`📊 RESUMEN: ${this.col.ownedCount()}/${this.col.totalBase} (${this.col.completionPct()}%)`);
-      lines.push(`🥤 Coca-Cola: ${this.col.cocaOwnedCount()}/14`);
-      lines.push(`🔄 Repetidas: ${this.col.repeatedCount()}`);
+      lines.push('RESUMEN: ' + this.col.ownedCount() + '/' + this.col.totalBase + ' (' + this.col.completionPct() + '%)');
+      lines.push('Coca-Cola: ' + this.col.cocaOwnedCount() + '/14');
+      lines.push('Repetidas: ' + this.col.repeatedCount());
       lines.push('');
-
       for (const team of TEAMS) {
         const owned = team.stickers.filter(s => !missingIds.has(s.id));
-        if (owned.length > 0) {
-          lines.push(`${team.flag} ${team.name}: ${owned.length}/20 → ${owned.map(s => s.id).join(' · ')}`);
-        }
+        if (owned.length > 0)
+          lines.push(team.name + ': ' + owned.length + '/20 -> ' + owned.map(s => s.id).join(' - '));
       }
     }
-
     return lines.join('\n');
   }
 
   copyToClipboard(type: 'missing' | 'repeated' | 'all'): void {
     const text = this.exportAsText(type);
     navigator.clipboard.writeText(text).then(() => {
-      alert('📋 ¡Copiado! Podés pegarlo en WhatsApp o cualquier mensaje.');
+      alert('Copiado! Podes pegarlo en WhatsApp.');
     });
   }
 
-  // ── Helpers PDF ───────────────────────────────────────────
-  private addHeader(doc: jsPDF, subtitle: string, user: string): number {
-    // Logo mascota
-    try {
-      doc.addImage(MASCOTA_B64, 'PNG', 170, 8, 28, 28);
-    } catch(e) {}
-
-    doc.setFontSize(18); doc.setTextColor(255, 130, 0); doc.setFont('helvetica', 'bold');
-    doc.text('URISCO', 14, 18);
-    doc.setFontSize(10); doc.setTextColor(100); doc.setFont('helvetica', 'normal');
-    doc.text('PANINI · FIFA WORLD CUP 2026', 14, 25);
-
-    doc.setDrawColor(255, 130, 0); doc.setLineWidth(0.5);
-    doc.line(14, 30, 196, 30);
-
-    doc.setFontSize(13); doc.setTextColor(30); doc.setFont('helvetica', 'bold');
-    doc.text(`${subtitle} — ${user}`, 14, 40);
-    doc.setFont('helvetica', 'normal');
-    return 48;
+  // ── Helpers ───────────────────────────────────────────────
+  private header(doc: jsPDF, subtitle: string, user: string): number {
+    try { doc.addImage(MASCOTA_B64, 'PNG', 178, 6, 20, 20); } catch(e) {}
+    doc.setFontSize(20); doc.setTextColor(255,130,0); doc.setFont('helvetica','bold');
+    doc.text('URISCO', 14, 16);
+    doc.setFontSize(9); doc.setTextColor(140); doc.setFont('helvetica','normal');
+    doc.text('PANINI - FIFA WORLD CUP 2026', 14, 23);
+    doc.setDrawColor(255,130,0); doc.setLineWidth(0.4);
+    doc.line(14, 27, 196, 27);
+    doc.setFontSize(13); doc.setTextColor(30); doc.setFont('helvetica','bold');
+    doc.text(subtitle + ' - ' + user, 14, 36);
+    doc.setFont('helvetica','normal');
+    return 44;
   }
 
-  private addBlock(doc: jsPDF, title: string, ids: string[], y: number, color: string): number {
-    y = this.checkPage(doc, y, 16);
-    // Title row with colored background
-    doc.setFillColor(240, 244, 255);
-    doc.roundedRect(13, y - 4, 184, 8, 1, 1, 'F');
-    doc.setFontSize(9); doc.setTextColor(30, 80, 160); doc.setFont('helvetica', 'bold');
-    doc.text(title, 16, y + 0.5);
-    y += 7;
-
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(60);
-    // Chunk ids into rows of ~12
-    const chunks = this.chunkArray(ids, 14);
-    for (const chunk of chunks) {
-      y = this.checkPage(doc, y, 6);
-      doc.text(chunk.join('  '), 16, y);
+  private block(doc: jsPDF, title: string, ids: string[], y: number): number {
+    y = this.pg(doc, y, 14);
+    doc.setFillColor(235, 240, 255);
+    doc.rect(13, y - 4, 184, 7, 'F');
+    doc.setFontSize(8); doc.setTextColor(40,80,160); doc.setFont('helvetica','bold');
+    doc.text(title, 15, y);
+    y += 6;
+    doc.setFont('helvetica','normal'); doc.setTextColor(50);
+    for (const chunk of this.chunks(ids, 18)) {
+      y = this.pg(doc, y, 5);
+      doc.text(chunk.join('  '), 15, y);
       y += 5;
     }
-    return y + 3;
+    return y + 2;
   }
 
-  private addRepBlock(doc: jsPDF, title: string, items: {id:string,count:number}[], y: number): number {
-    y = this.checkPage(doc, y, 16);
-    doc.setFillColor(240, 248, 255);
-    doc.roundedRect(13, y - 4, 184, 8, 1, 1, 'F');
-    doc.setFontSize(9); doc.setTextColor(30, 80, 160); doc.setFont('helvetica', 'bold');
-    doc.text(title, 16, y + 0.5);
-    y += 7;
-
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(60);
-    const chunks = this.chunkArray(items.map(i => `${i.id}×${i.count}`), 12);
-    for (const chunk of chunks) {
-      y = this.checkPage(doc, y, 6);
-      doc.text(chunk.join('   '), 16, y);
+  private repBlock(doc: jsPDF, title: string, items: string[], y: number): number {
+    y = this.pg(doc, y, 14);
+    doc.setFillColor(235, 245, 255);
+    doc.rect(13, y - 4, 184, 7, 'F');
+    doc.setFontSize(8); doc.setTextColor(40,80,160); doc.setFont('helvetica','bold');
+    doc.text(title, 15, y);
+    y += 6;
+    doc.setFont('helvetica','normal'); doc.setTextColor(50);
+    for (const chunk of this.chunks(items, 14)) {
+      y = this.pg(doc, y, 5);
+      doc.text(chunk.join('   '), 15, y);
       y += 5;
     }
-    return y + 3;
+    return y + 2;
   }
 
-  private addTeamBlock(doc: jsPDF, title: string, ownedCount: number, total: number, owned: string[], missing: string[], y: number): number {
-    y = this.checkPage(doc, y, 14);
-    // Header row
+  private teamBlock(doc: jsPDF, title: string, ownedCount: number, total: number, owned: string[], missing: string[], y: number): number {
+    y = this.pg(doc, y, 12);
     const pct = Math.round((ownedCount / total) * 100);
-    doc.setFillColor(240, 248, 235);
-    doc.roundedRect(13, y - 4, 184, 8, 1, 1, 'F');
-    doc.setFontSize(9); doc.setTextColor(30, 100, 30); doc.setFont('helvetica', 'bold');
-    doc.text(`${title}  —  ${ownedCount}/${total}  (${pct}%)`, 16, y + 0.5);
-    y += 7;
-
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-
+    doc.setFillColor(235, 248, 235);
+    doc.rect(13, y - 4, 184, 7, 'F');
+    doc.setFontSize(8); doc.setTextColor(30,100,30); doc.setFont('helvetica','bold');
+    doc.text(title + '  -  ' + ownedCount + '/' + total + '  (' + pct + '%)', 15, y);
+    y += 5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
     if (owned.length) {
-      doc.setTextColor(30, 120, 30);
-      const chunks = this.chunkArray(owned, 16);
-      for (const chunk of chunks) {
-        y = this.checkPage(doc, y, 5);
-        doc.text('✓ ' + chunk.join('  '), 16, y);
+      for (const chunk of this.chunks(owned, 18)) {
+        y = this.pg(doc, y, 5);
+        doc.setTextColor(30,120,30);
+        doc.text('+ ' + chunk.join('  '), 15, y);
         y += 4.5;
       }
     }
     if (missing.length) {
-      doc.setTextColor(160, 40, 40);
-      const chunks = this.chunkArray(missing, 16);
-      for (const chunk of chunks) {
-        y = this.checkPage(doc, y, 5);
-        doc.text('✗ ' + chunk.join('  '), 16, y);
+      for (const chunk of this.chunks(missing, 18)) {
+        y = this.pg(doc, y, 5);
+        doc.setTextColor(160,40,40);
+        doc.text('- ' + chunk.join('  '), 15, y);
         y += 4.5;
       }
     }
-    return y + 4;
+    return y + 3;
   }
 
-  private checkPage(doc: jsPDF, y: number, needed: number): number {
+  private pg(doc: jsPDF, y: number, needed: number): number {
     if (y + needed > 278) {
       doc.addPage();
-      // Mini header on continuation pages
-      doc.setFontSize(7); doc.setTextColor(180); doc.setFont('helvetica', 'normal');
-      doc.text('URISCO · PANINI 2026', 14, 8);
-      doc.setDrawColor(220); doc.setLineWidth(0.3);
-      doc.line(14, 10, 196, 10);
-      return 16;
+      doc.setFontSize(7); doc.setTextColor(180); doc.setFont('helvetica','normal');
+      doc.text('URISCO - PANINI 2026', 14, 8);
+      doc.setDrawColor(220); doc.setLineWidth(0.2); doc.line(14, 10, 196, 10);
+      return 15;
     }
     return y;
   }
 
-  private chunkArray<T>(arr: T[], size: number): T[][] {
-    const chunks = [];
-    for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
-    return chunks;
+  private chunks<T>(arr: T[], size: number): T[][] {
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
   }
 
-  private today(): string {
-    return new Date().toLocaleDateString('es-CR');
-  }
+  private today(): string { return new Date().toLocaleDateString('es-CR'); }
 }
