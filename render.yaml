@@ -1,0 +1,31 @@
+services:
+  # ─── BACKEND (FastAPI) ────────────────────────────────────
+  - type: web
+    name: panini2026-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true          # Render auto-genera una clave segura
+      - key: DB_PATH
+        value: /opt/render/project/src/panini.db
+    disk:
+      name: db-storage
+      mountPath: /opt/render/project/src
+      sizeGB: 1                      # 1 GB es más que suficiente
+    plan: free
+
+  # ─── FRONTEND (Angular como sitio estático) ───────────────
+  - type: web
+    name: panini2026-app
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build -- --configuration production
+    staticPublishPath: dist/panini2026/browser
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html     # necesario para Angular routing
+    plan: free
