@@ -25,7 +25,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 app = FastAPI(title="Álbum Panini 2026 API", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://panini2026-app.onrender.com", "http://localhost:4200"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
