@@ -134,7 +134,7 @@ import { TEAMS, FWC_STICKERS, COCA_STICKERS } from '../../models/album-data';
       white-space: nowrap;
     }
     .ftab.active { background: #e8c84a; color: #000; font-weight: 700; }
-    .search-wrap { flex: 1; min-width: 180px; max-width: 280px; }
+    .search-wrap { flex: 1; min-width: 120px; max-width: 280px; }
     .search-wrap input {
       width: 100%;
       padding: 0.45rem 0.85rem;
@@ -200,7 +200,7 @@ import { TEAMS, FWC_STICKERS, COCA_STICKERS } from '../../models/album-data';
 
     .sticker-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
       gap: 0.4rem;
       padding: 0.75rem 0.5rem;
     }
