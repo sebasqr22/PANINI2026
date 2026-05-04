@@ -71,6 +71,15 @@ export class ApiService {
     if (!res.ok) throw new Error('Error al actualizar postal');
   }
 
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    const res = await this.authFetch('/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail ?? 'Error al cambiar contraseña'); }
+  }
   private authFetch(path: string, init: RequestInit = {}): Promise<Response> {
     return fetch(`${this.baseUrl}${path}`, {
       ...init,
