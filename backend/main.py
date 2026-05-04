@@ -223,3 +223,8 @@ def health():
         return {"status": "ok", "db": True}
     except Exception as e:
         return {"status": "error", "db": False, "detail": str(e)}
+
+@app.head("/health")
+def health_head():
+    from fastapi import Response
+    return Response(status_code=200)
