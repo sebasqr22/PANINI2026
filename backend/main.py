@@ -2,7 +2,7 @@ import json
 import os
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict
 
 import psycopg2
 import psycopg2.extras
@@ -25,7 +25,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 app = FastAPI(title="Álbum Panini 2026 API", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://panini2026-app.onrender.com", "http://localhost:4200"],
+    allow_origins=["https://panini2026-app.onrender.com", "http://localhost:4200", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,8 +93,8 @@ class Token(BaseModel):
     username: str
 
 class CollectionData(BaseModel):
-    owned:    dict[str, bool]
-    repeated: dict[str, int]
+    owned:    Dict[str, bool]
+    repeated: Dict[str, int]
 
 class StickerUpdate(BaseModel):
     sticker_id: str
