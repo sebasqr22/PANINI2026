@@ -1,20 +1,20 @@
 import { Component, Input, Output, EventEmitter, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { Sticker } from '../../models/sticker.model';
 import { CollectionService } from '../../services/collection.service';
 
 @Component({
   selector: 'app-sticker-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   template: `
-    <div class="backdrop" (click)="onBackdropClick($event)">
+    <div class="backdrop" (click)="close.emit()">
       <div class="modal" (click)="$event.stopPropagation()">
-        <button class="close" (click)="close.emit()">✕</button>
+        <button class="close-btn" (click)="close.emit()">✕</button>
 
-        <div class="sticker-preview" [class.owned-preview]="owned()" [class.coca-preview]="sticker.section === 'coca'">
-          <span class="preview-icon">
+        <!-- Preview -->
+        <div class="preview" [class.owned-p]="total() > 0" [class.coca-p]="sticker.section === 'coca'">
+          <span class="p-icon">
             @if (sticker.section === 'coca') { 🥤 }
             @else if (sticker.type === 'foil') { ✨ }
             @else if (sticker.type === 'history') { 🏅 }
@@ -23,197 +23,134 @@ import { CollectionService } from '../../services/collection.service';
             @else { ⚽ }
           </span>
           <div>
-            <div class="preview-id">{{ sticker.id }}</div>
-            <div class="preview-name">{{ sticker.name }}</div>
-            @if (sticker.teamName) {
-              <div class="preview-team">{{ sticker.teamName }}</div>
-            }
-            @if (sticker.section === 'coca') {
-              <div class="preview-team" style="color: #ff4444">Coca-Cola Exclusiva</div>
-            }
-            <div class="preview-type">
-              @if (sticker.type === 'foil') { <span class="badge foil-badge">✨ FOIL</span> }
-              @else if (sticker.type === 'history') { <span class="badge hist-badge">🏅 Historia</span> }
-              @else if (sticker.section === 'coca') { <span class="badge coca-badge">🥤 Coca-Cola</span> }
-              @else { <span class="badge normal-badge">Normal</span> }
+            <div class="p-id">{{ sticker.id }}</div>
+            @if (sticker.teamName) { <div class="p-team">{{ sticker.teamName }}</div> }
+            @if (sticker.section === 'coca') { <div class="p-team coca-label">Coca-Cola Exclusiva</div> }
+            <div class="p-type">
+              @if (sticker.type === 'foil') { <span class="badge badge-foil">✨ FOIL</span> }
+              @else if (sticker.type === 'history') { <span class="badge badge-hist">🏅 Historia</span> }
+              @else if (sticker.section === 'coca') { <span class="badge badge-coca">🥤 Coca-Cola</span> }
+              @else { <span class="badge badge-norm">Normal</span> }
             </div>
           </div>
         </div>
 
+        <!-- Status -->
         <div class="status-row">
-          <span class="status-label">Estado:</span>
-          <span class="status-val" [class.have]="owned()" [class.missing]="!owned()">
-            {{ owned() ? '✓ La tengo' : '✕ Me falta' }}
-          </span>
-        </div>
-
-        <div class="actions">
-          @if (!owned()) {
-            <button class="btn-have" (click)="markOwned()">✓ La tengo</button>
+          @if (total() === 0) {
+            <span class="status missing">✕ No la tengo</span>
+          } @else if (total() === 1) {
+            <span class="status have">✓ La tengo</span>
           } @else {
-            <button class="btn-remove" (click)="removeOwned()">✕ Quitar</button>
+            <span class="status have">✓ Tengo {{ total() }}  <span class="rep-info">({{ total() - 1 }} repetida{{ total() - 1 !== 1 ? 's' : '' }})</span></span>
           }
+          @if (svc.syncing()) { <span class="syncing">⏳</span> }
         </div>
 
-        @if (owned()) {
-          <div class="repeated-section">
-            <label>Repetidas (extras que tengo):</label>
-            <div class="rep-row">
-              <button class="rep-btn" (click)="decRep()">−</button>
-              <span class="rep-count">{{ repeatedCount() }}</span>
-              <button class="rep-btn" (click)="incRep()">+</button>
-            </div>
-            @if (repeatedCount() > 0) {
-              <p class="rep-hint">Tenés {{ repeatedCount() }} {{ repeatedCount() === 1 ? 'repetida' : 'repetidas' }} para cambiar</p>
-            }
+        <!-- Counter -->
+        <div class="counter-wrap">
+          <button class="counter-btn minus" (click)="decrement()" [disabled]="total() === 0 || svc.syncing()">−</button>
+          <div class="counter-display">
+            <span class="counter-num" [class.zero]="total() === 0">{{ total() }}</span>
+            <span class="counter-label">
+              @if (total() === 0) { sin marcar }
+              @else if (total() === 1) { en el álbum }
+              @else { + {{ total() - 1 }} extra{{ total() - 1 !== 1 ? 's' : '' }} }
+            </span>
           </div>
-        }
+          <button class="counter-btn plus" (click)="increment()" [disabled]="svc.syncing()">+</button>
+        </div>
+
       </div>
     </div>
   `,
   styles: [`
-    .backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.75);
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      backdrop-filter: blur(2px);
-    }
-    .modal {
-      background: #14141e;
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 18px;
-      padding: 1.75rem;
-      width: 100%;
-      max-width: 380px;
-      position: relative;
-    }
-    .close {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      background: rgba(255,255,255,0.08);
-      border: none;
-      color: #aaa;
-      width: 30px; height: 30px;
+    .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.8); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(3px); }
+    .modal { background: #0f0800; border: 1px solid rgba(255,130,0,.2); border-radius: 18px; padding: 1.75rem; width: 100%; max-width: 360px; position: relative; box-shadow: 0 0 40px rgba(255,130,0,.1); }
+    .close-btn { position: absolute; top: 1rem; right: 1rem; background: rgba(255,130,0,.08); border: 1px solid rgba(255,130,0,.15); color: #664400; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: .85rem; display: flex; align-items: center; justify-content: center; }
+    .close-btn:hover { color: #ff8200; }
+
+    .preview { display: flex; align-items: center; gap: 1rem; background: #070400; border: 1px solid rgba(255,130,0,.1); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+    .preview.owned-p { border-color: rgba(255,130,0,.3); background: rgba(255,130,0,.05); }
+    .preview.coca-p { border-color: rgba(208,2,27,.3); }
+    .p-icon { font-size: 2.5rem; flex-shrink: 0; }
+    .p-id { font-size: 1.1rem; font-weight: 900; color: #ff8200; letter-spacing: 1px; }
+    .p-team { font-size: .82rem; color: #664400; margin-top: .2rem; }
+    .coca-label { color: #ff4444 !important; }
+    .p-type { margin-top: .5rem; }
+    .badge { display: inline-block; padding: .15rem .6rem; border-radius: 4px; font-size: .72rem; font-weight: 600; }
+    .badge-foil { background: rgba(255,130,0,.15); color: #ff8200; }
+    .badge-hist { background: rgba(192,132,252,.15); color: #c084fc; }
+    .badge-coca { background: rgba(208,2,27,.15); color: #ff4444; }
+    .badge-norm { background: rgba(255,255,255,.05); color: #664400; }
+
+    .status-row { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.5rem; }
+    .status { font-size: .88rem; font-weight: 700; padding: .3rem .85rem; border-radius: 6px; }
+    .have { background: rgba(46,204,113,.12); color: #2ecc71; }
+    .missing { background: rgba(255,130,0,.08); color: #664400; }
+    .rep-info { font-weight: 400; font-size: .8rem; color: #3498db; }
+    .syncing { font-size: .85rem; color: #ff8200; margin-left: auto; }
+
+    /* Counter */
+    .counter-wrap { display: flex; align-items: center; justify-content: center; gap: 1.25rem; padding: 1rem; background: #070400; border: 1px solid rgba(255,130,0,.1); border-radius: 14px; }
+    .counter-btn {
+      width: 52px; height: 52px;
       border-radius: 50%;
+      border: none;
+      font-size: 1.8rem;
+      font-weight: 300;
       cursor: pointer;
-      font-size: 0.85rem;
+      transition: all .12s;
       display: flex; align-items: center; justify-content: center;
+      line-height: 1;
     }
-    .close:hover { background: rgba(255,255,255,0.15); color: white; }
+    .counter-btn.plus { background: #ff8200; color: #000; box-shadow: 0 4px 15px rgba(255,130,0,.35); }
+    .counter-btn.plus:hover:not(:disabled) { background: #ff9a33; transform: scale(1.05); }
+    .counter-btn.minus { background: rgba(255,130,0,.1); color: #ff8200; border: 1px solid rgba(255,130,0,.25); }
+    .counter-btn.minus:hover:not(:disabled) { background: rgba(255,130,0,.2); }
+    .counter-btn:disabled { opacity: .3; cursor: not-allowed; transform: none !important; }
 
-    .sticker-preview {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      background: #0e0e1a;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      margin-bottom: 1.25rem;
-    }
-    .sticker-preview.owned-preview { border-color: rgba(46,204,113,0.3); background: rgba(46,204,113,0.06); }
-    .sticker-preview.coca-preview { border-color: rgba(208,2,27,0.3); }
-    .preview-icon { font-size: 2.5rem; flex-shrink: 0; }
-    .preview-id { font-size: 0.75rem; color: #888; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-    .preview-name { font-size: 1.05rem; font-weight: 700; color: #eee; margin: 0.2rem 0; }
-    .preview-team { font-size: 0.82rem; color: #aaa; }
-    .preview-type { margin-top: 0.5rem; }
-    .badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
-    .foil-badge { background: rgba(232,200,74,0.15); color: #e8c84a; }
-    .hist-badge { background: rgba(192,132,252,0.15); color: #c084fc; }
-    .coca-badge { background: rgba(208,2,27,0.15); color: #ff4444; }
-    .normal-badge { background: rgba(255,255,255,0.06); color: #aaa; }
-
-    .status-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
-    .status-label { font-size: 0.85rem; color: #888; }
-    .status-val { font-weight: 700; font-size: 0.9rem; padding: 0.25rem 0.75rem; border-radius: 6px; }
-    .have { background: rgba(46,204,113,0.15); color: #2ecc71; }
-    .missing { background: rgba(231,76,60,0.15); color: #e74c3c; }
-
-    .actions { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; }
-    .btn-have {
-      flex: 1; padding: 0.8rem;
-      background: #2ecc71; color: #000;
-      font-weight: 800; font-size: 0.95rem;
-      border: none; border-radius: 10px; cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    .btn-have:hover { opacity: 0.85; }
-    .btn-remove {
-      flex: 1; padding: 0.8rem;
-      background: rgba(231,76,60,0.15); color: #e74c3c;
-      font-weight: 700; font-size: 0.9rem;
-      border: 1px solid rgba(231,76,60,0.3); border-radius: 10px; cursor: pointer;
-    }
-    .btn-remove:hover { background: rgba(231,76,60,0.25); }
-
-    .repeated-section {
-      border-top: 1px solid rgba(255,255,255,0.08);
-      padding-top: 1rem;
-    }
-    label { display: block; font-size: 0.82rem; color: #888; margin-bottom: 0.75rem; }
-    .rep-row { display: flex; align-items: center; gap: 1rem; }
-    .rep-btn {
-      width: 38px; height: 38px;
-      background: #1a1a2e;
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 8px;
-      color: white;
-      font-size: 1.2rem;
-      cursor: pointer;
-      transition: background 0.12s;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .rep-btn:hover { background: #252540; }
-    .rep-count { font-size: 1.5rem; font-weight: 800; color: #3498db; min-width: 40px; text-align: center; }
-    .rep-hint { font-size: 0.78rem; color: #3498db; margin-top: 0.75rem; margin-bottom: 0; }
+    .counter-display { text-align: center; min-width: 80px; }
+    .counter-num { display: block; font-size: 3rem; font-weight: 900; color: #ff8200; line-height: 1; }
+    .counter-num.zero { color: #2a1500; }
+    .counter-label { display: block; font-size: .72rem; color: #442200; margin-top: .25rem; text-transform: uppercase; letter-spacing: .5px; }
   `]
 })
 export class StickerModalComponent implements OnInit {
   @Input({ required: true }) sticker!: Sticker;
   @Output() close = new EventEmitter<void>();
 
-  owned = signal(false);
-  repeatedCount = signal(0);
+  // total = cantidad física de cartas que tengo
+  // 0 = no tengo, 1 = tengo una (en álbum), 2+ = una en álbum + repetidas
+  total = signal(0);
 
-  constructor(private svc: CollectionService) {}
+  constructor(public svc: CollectionService) {}
 
   ngOnInit() {
-    this.owned.set(this.svc.isOwned(this.sticker.id));
-    this.repeatedCount.set(this.svc.getRepeated(this.sticker.id));
+    const owned    = this.svc.isOwned(this.sticker.id);
+    const repeated = this.svc.getRepeated(this.sticker.id);
+    this.total.set(owned ? 1 + repeated : 0);
   }
 
-  markOwned() {
-    this.svc.setOwned(this.sticker.id, true);
-    this.owned.set(true);
+  async increment() {
+    const newTotal = this.total() + 1;
+    this.total.set(newTotal);
+    await this.sync(newTotal);
   }
 
-  removeOwned() {
-    this.svc.setOwned(this.sticker.id, false);
-    this.owned.set(false);
-    this.repeatedCount.set(0);
+  async decrement() {
+    if (this.total() === 0) return;
+    const newTotal = this.total() - 1;
+    this.total.set(newTotal);
+    await this.sync(newTotal);
   }
 
-  incRep() {
-    const val = this.repeatedCount() + 1;
-    this.repeatedCount.set(val);
-    this.svc.setRepeated(this.sticker.id, val);
-  }
-
-  decRep() {
-    if (this.repeatedCount() <= 0) return;
-    const val = this.repeatedCount() - 1;
-    this.repeatedCount.set(val);
-    this.svc.setRepeated(this.sticker.id, val);
-  }
-
-  onBackdropClick(e: Event) {
-    this.close.emit();
+  private async sync(total: number) {
+    if (total === 0) {
+      await this.svc.setOwned(this.sticker.id, false);
+    } else {
+      await this.svc.setOwned(this.sticker.id, true);
+      await this.svc.setRepeated(this.sticker.id, total - 1);
+    }
   }
 }

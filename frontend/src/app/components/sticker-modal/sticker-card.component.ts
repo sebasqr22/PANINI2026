@@ -10,12 +10,19 @@ import { CollectionService } from '../../services/collection.service';
   template: `
     <div class="card"
       [class.owned]="owned()"
-      [class.repeated]="repeated() > 0"
+      [class.has-extra]="repeated() > 0"
       [class.foil]="sticker.type === 'foil'"
       [class.history]="sticker.type === 'history'"
       [class.coca]="sticker.section === 'coca'"
       (click)="selected.emit(sticker)">
-      @if (repeated() > 0) { <span class="rep-badge">+{{ repeated() }}</span> }
+
+      <!-- Total badge (top-right) -->
+      @if (owned()) {
+        <span class="total-badge" [class.with-extra]="repeated() > 0">
+          {{ 1 + repeated() }}
+        </span>
+      }
+
       <span class="sticker-icon">
         @if (sticker.section === 'coca') { 🥤 }
         @else if (sticker.type === 'foil') { ✨ }
@@ -25,7 +32,6 @@ import { CollectionService } from '../../services/collection.service';
         @else { ⚽ }
       </span>
       <span class="sticker-id">{{ sticker.id }}</span>
-      @if (owned()) { <span class="checkmark">✓</span> }
     </div>
   `,
   styles: [`
@@ -39,7 +45,7 @@ import { CollectionService } from '../../services/collection.service';
       background: #0f0800;
       position: relative;
       user-select: none;
-      min-height: 75px;
+      min-height: 72px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -48,37 +54,37 @@ import { CollectionService } from '../../services/collection.service';
     }
     .card:hover { border-color: rgba(255,130,0,.35); background: #160b00; transform: translateY(-1px); }
     .card:active { transform: scale(.96); }
+
     .card.owned { background: rgba(46,204,113,.08); border-color: rgba(46,204,113,.4); }
-    .card.repeated { background: rgba(52,152,219,.08); border-color: rgba(52,152,219,.4); }
+    .card.has-extra { background: rgba(52,152,219,.08); border-color: rgba(52,152,219,.4); }
     .card.foil { border-color: rgba(255,130,0,.3); }
     .card.history { border-color: rgba(192,132,252,.25); }
     .card.coca { background: rgba(208,2,27,.07); border-color: rgba(208,2,27,.3); }
-    .card.coca.owned { background: rgba(208,2,27,.15); }
+    .card.coca.owned { background: rgba(208,2,27,.12); }
 
     .sticker-icon { font-size: 1.3rem; line-height: 1; }
 
     .sticker-id {
-      font-size: .72rem;
-      font-weight: 800;
-      color: rgba(255,130,0,.5);
-      letter-spacing: .5px;
-      text-transform: uppercase;
+      font-size: .7rem; font-weight: 800;
+      color: rgba(255,130,0,.35);
+      letter-spacing: .5px; text-transform: uppercase;
     }
     .card.owned .sticker-id { color: #2ecc71; }
-    .card.repeated .sticker-id { color: #3498db; }
+    .card.has-extra .sticker-id { color: #3498db; }
     .card.history .sticker-id { color: #c084fc; }
     .card.coca .sticker-id { color: #ff4444; }
-    .card.coca.owned .sticker-id { color: #ff6666; }
 
-    .rep-badge {
+    /* Badge showing total count */
+    .total-badge {
       position: absolute; top: 3px; right: 3px;
-      background: #3498db; color: white;
-      font-size: .55rem; font-weight: 800;
-      padding: 1px 4px; border-radius: 4px;
+      background: #2ecc71; color: #000;
+      font-size: .6rem; font-weight: 900;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
     }
-    .checkmark {
-      position: absolute; bottom: 3px; right: 4px;
-      color: #2ecc71; font-size: .7rem; font-weight: 900;
+    .total-badge.with-extra {
+      background: #3498db; color: white;
     }
   `]
 })
