@@ -97,21 +97,21 @@ import { PdfService } from '../../services/pdf.service';
 
     .stats-bar { display: flex; align-items: center; gap: .5rem 1.25rem; padding: .6rem 1.5rem; background: #070400; border-top: 1px solid rgba(255,130,0,.08); flex-wrap: wrap; }
     .stat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-    .stat-label { font-size: .65rem; color: #442200; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+    .stat-label { font-size: .65rem; color: #aa8855; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
     .stat-val { font-size: 1.1rem; font-weight: 800; }
     .green { color: #2ecc71; }
     .red { color: #e74c3c; }
     .blue { color: #3498db; }
     .amber { color: #ff8200; }
-    .stat-sep { width: 1px; height: 30px; background: rgba(255,130,0,.1); }
+    .stat-sep { width: 1px; height: 30px; background: rgba(255,130,0,.25); }
 
     .progress-wrap { flex: 1; min-width: 160px; }
     .progress-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
-    .prog-label { font-size: .68rem; color: #442200; }
+    .prog-label { font-size: .68rem; color: #aa8855; }
     .prog-pct { font-size: .68rem; font-weight: 700; color: #ff8200; }
-    .prog-bar { height: 6px; background: rgba(255,130,0,.1); border-radius: 3px; overflow: hidden; }
+    .prog-bar { height: 6px; background: rgba(255,130,0,.2); border-radius: 3px; overflow: hidden; }
     .prog-fill { height: 100%; background: linear-gradient(90deg, #cc5500, #ff8200); border-radius: 3px; transition: width .4s; }
-    .prog-sub { font-size: .62rem; color: #2a1500; margin-top: 2px; }
+    .prog-sub { font-size: .62rem; color: #997755; margin-top: 2px; }
 
     .btn-pdf { padding: .4rem .85rem; background: rgba(255,130,0,.08); border: 1px solid rgba(255,130,0,.2); border-radius: 7px; color: #664400; font-size: .78rem; cursor: pointer; white-space: nowrap; }
     .btn-pdf:hover { background: rgba(255,130,0,.15); color: #ff8200; }
