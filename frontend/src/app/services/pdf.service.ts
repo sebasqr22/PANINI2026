@@ -112,16 +112,23 @@ export class PdfService {
       if (cocaM.length) { lines.push('*Coca-Cola*'); lines.push(cocaM.join('  |  ')); }
 
     } else if (type === 'repeated') {
-      lines.push('REPETIDAS (' + this.col.repeatedCount() + ')');
+      lines.push('Repetidas - URISCO PANINI 2026 - ' + user);
+      lines.push(this.today());
       lines.push('');
-      const fwcR = FWC_STICKERS.filter(s => (repMap[s.id] ?? 0) > 0);
-      if (fwcR.length) { lines.push('*Seccion FWC*'); lines.push(fwcR.map(s => s.id + ' (×' + repMap[s.id] + ')').join('  |  ')); lines.push(''); }
+      const numFmt = (id: string, prefix: string, count: number) => {
+        const num = id.replace(prefix, '').replace(/^0+/, '');
+        return count > 1 ? num + 'x' + count : num;
+      };
+      const fwcFoil = FWC_STICKERS.filter(s => s.type === 'foil'    && (repMap[s.id] ?? 0) > 0);
+      const fwcHist = FWC_STICKERS.filter(s => s.type === 'history' && (repMap[s.id] ?? 0) > 0);
+      if (fwcFoil.length) lines.push('FWC (intro): ' + fwcFoil.map(s => numFmt(s.id, 'FWC', repMap[s.id])).join(', '));
+      if (fwcHist.length) lines.push('FWC (hist): '  + fwcHist.map(s => numFmt(s.id, 'FWC', repMap[s.id])).join(', '));
       for (const team of TEAMS) {
         const tr = team.stickers.filter(s => (repMap[s.id] ?? 0) > 0);
-        if (tr.length) { lines.push('*' + team.name + '*'); lines.push(tr.map(s => s.id + ' (×' + repMap[s.id] + ')').join('  |  ')); lines.push(''); }
+        if (tr.length) lines.push(team.name + ' ' + team.flag + ': ' + tr.map(s => numFmt(s.id, team.code, repMap[s.id])).join(', '));
       }
       const cocaR = COCA_STICKERS.filter(s => (repMap[s.id] ?? 0) > 0);
-      if (cocaR.length) { lines.push('*Coca-Cola*'); lines.push(cocaR.map(s => s.id + ' (×' + repMap[s.id] + ')').join('  |  ')); }
+      if (cocaR.length) lines.push('CC (Coca-Cola): ' + cocaR.map(s => numFmt(s.id, 'CC', repMap[s.id])).join(', '));
 
     } else {
       lines.push('RESUMEN: ' + this.col.ownedCount() + '/' + this.col.totalBase + ' (' + this.col.completionPct() + '%)');

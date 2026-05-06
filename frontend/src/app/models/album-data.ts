@@ -34,7 +34,7 @@ export const FWC_STICKERS: Sticker[] = [
 // ─────────────────────────────────────────────
 export const COCA_STICKERS: Sticker[] = [
   { id: 'CC01', name: 'Lamine Yamal (España)', section: 'coca', type: 'special', albumOrder: 1 },
-  { id: 'CC02', name: 'Lautaro Martínez (Argentina)', section: 'coca', type: 'special', albumOrder: 2 },
+  { id: 'CC02', name: 'Joshua Kimmich (Alemania)', section: 'coca', type: 'special', albumOrder: 2 },
   { id: 'CC03', name: 'Harry Kane (Inglaterra)', section: 'coca', type: 'special', albumOrder: 3 },
   { id: 'CC04', name: 'Joshua Kimmich (Alemania)', section: 'coca', type: 'special', albumOrder: 4 },
   { id: 'CC05', name: 'Vinicius Jr. (Brasil)', section: 'coca', type: 'special', albumOrder: 5 },
