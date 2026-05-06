@@ -24,6 +24,7 @@ import { CollectionService } from '../../services/collection.service';
           </span>
           <div>
             <div class="p-id">{{ sticker.id }}</div>
+            <div class="p-name">{{ sticker.name }}</div>
             @if (sticker.teamName) { <div class="p-team">{{ sticker.teamName }}</div> }
             @if (sticker.section === 'coca') { <div class="p-team coca-label">Coca-Cola Exclusiva</div> }
             <div class="p-type">
@@ -75,7 +76,8 @@ import { CollectionService } from '../../services/collection.service';
     .preview.coca-p { border-color: rgba(208,2,27,.3); }
     .p-icon { font-size: 2.5rem; flex-shrink: 0; }
     .p-id { font-size: 1.1rem; font-weight: 900; color: #ff8200; letter-spacing: 1px; }
-    .p-team { font-size: .82rem; color: #664400; margin-top: .2rem; }
+    .p-name { font-size: .9rem; font-weight: 600; color: #e0c090; margin-top: .2rem; }
+    .p-team { font-size: .82rem; color: #664400; margin-top: .15rem; }
     .coca-label { color: #ff4444 !important; }
     .p-type { margin-top: .5rem; }
     .badge { display: inline-block; padding: .15rem .6rem; border-radius: 4px; font-size: .72rem; font-weight: 600; }
