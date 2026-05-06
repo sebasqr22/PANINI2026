@@ -116,8 +116,7 @@ export class PdfService {
       lines.push(this.today());
       lines.push('');
       const numFmt = (id: string, prefix: string, count: number) => {
-        const num = id.replace(prefix, '').replace(/^0+/, '');
-        return count > 1 ? num + 'x' + count : num;
+        return id.replace(prefix, '').replace(/^0+/, '');
       };
       const fwcFoil = FWC_STICKERS.filter(s => s.type === 'foil'    && (repMap[s.id] ?? 0) > 0);
       const fwcHist = FWC_STICKERS.filter(s => s.type === 'history' && (repMap[s.id] ?? 0) > 0);
