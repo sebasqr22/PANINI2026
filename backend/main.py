@@ -215,6 +215,52 @@ def get_stats(u=Depends(get_current_user), db=Depends(get_db_dep)):
         "total_repeated": sum(col["repeated"].values()),
     }
 
+# ── Change password ───────────────────────────────────────────
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+
+@app.post('/auth/change-password')
+def change_password(data: ChangePassword, u=Depends(get_current_user), db=Depends(get_db_dep)):
+    if not verify_password(data.current_password, u['password']):
+        raise HTTPException(400, 'La contrasena actual es incorrecta')
+    if len(data.new_password) < 4:
+        raise HTTPException(400, 'La nueva contrasena debe tener al menos 4 caracteres')
+    db.cursor().execute('UPDATE users SET password = %s WHERE id = %s',
+                        (hash_password(data.new_password), u['id']))
+    return {'ok': True, 'message': 'Contrasena actualizada'}
+
+# ── Admin ─────────────────────────────────────────────────────
+ADMIN_KEY = os.environ.get('ADMIN_KEY', '')
+
+class AdminReset(BaseModel):
+    admin_key: str
+    username: str
+    new_password: str
+
+@app.post('/admin/reset-password')
+def admin_reset(data: AdminReset, db=Depends(get_db_dep)):
+    if not ADMIN_KEY or data.admin_key != ADMIN_KEY:
+        raise HTTPException(403, 'Clave de administrador incorrecta')
+    if len(data.new_password) < 4:
+        raise HTTPException(400, 'La nueva contrasena debe tener al menos 4 caracteres')
+    cur = db.cursor()
+    cur.execute('SELECT id FROM users WHERE username = %s', (data.username,))
+    if not cur.fetchone():
+        raise HTTPException(404, 'Usuario no encontrado')
+    cur.execute('UPDATE users SET password = %s WHERE username = %s',
+                (hash_password(data.new_password), data.username))
+    return {'ok': True, 'message': 'Contrasena de ' + data.username + ' actualizada'}
+
+@app.get('/admin/users')
+def admin_list_users(admin_key: str, db=Depends(get_db_dep)):
+    if not ADMIN_KEY or admin_key != ADMIN_KEY:
+        raise HTTPException(403, 'Clave de administrador incorrecta')
+    cur = db.cursor()
+    cur.execute('SELECT id, username, created_at FROM users ORDER BY id')
+    return [dict(r) for r in cur.fetchall()]
+
+# ── Health ────────────────────────────────────────────────────
 @app.get("/health")
 def health():
     try:
