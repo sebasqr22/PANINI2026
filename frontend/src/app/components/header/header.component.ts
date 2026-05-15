@@ -54,6 +54,11 @@ import { ApiService } from '../../services/api.service';
             <span class="stat-label">🥤 Coca</span>
             <span class="stat-val amber">{{ svc.cocaOwnedCount() }}/14</span>
           </div>
+          <div class="stat-sep"></div>
+          <div class="stat">
+            <span class="stat-label">Equipos 🏆</span>
+            <span class="stat-val gold">{{ svc.fullTeams() }}/48</span>
+          </div>
         </div>
         <div class="progress-row-wrap">
           <div class="progress-wrap">
@@ -136,7 +141,7 @@ import { ApiService } from '../../services/api.service';
     .stat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
     .stat-label { font-size: .6rem; color: #aa8855; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
     .stat-val { font-size: 1rem; font-weight: 800; }
-    .green { color: #2ecc71; } .red { color: #e74c3c; } .blue { color: #3498db; } .amber { color: #ff8200; }
+    .green { color: #2ecc71; } .red { color: #e74c3c; } .blue { color: #3498db; } .amber { color: #ff8200; } .gold { color: #f1c40f; }
     .stat-sep { width: 1px; height: 28px; background: rgba(255,130,0,.2); flex-shrink: 0; }
 
     .progress-row-wrap { display: flex; align-items: center; gap: .75rem; }

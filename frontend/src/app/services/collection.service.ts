@@ -33,6 +33,10 @@ export class CollectionService {
   readonly missingCount  = computed(() => this.totalBase - this.ownedCount());
   readonly repeatedCount = computed(() => Object.values(this._repeated()).reduce((a, b) => a + b, 0));
   readonly completionPct = computed(() => Math.round((this.ownedCount() / this.totalBase) * 100));
+  readonly fullTeams     = computed(() => {
+    const o = this._owned();
+    return TEAMS.filter(t => t.stickers.every(s => (o as any)[s.id])).length;
+  });
 
   constructor(private api: ApiService) {
     if (this.api.token()) this.loadCollection();
