@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-05T18:40:51.217397+00:00",
+  "generated_at": "2026-06-13T07:20:10.076130+00:00",
   "total_users": 8,
   "total_collections": 7,
   "users": [
@@ -2305,6 +2305,7 @@
         "CZE13": true,
         "CZE14": true,
         "CZE15": true,
+        "CZE16": true,
         "CZE17": true,
         "CZE18": true,
         "CZE19": true,
@@ -2571,6 +2572,7 @@
         "RSA14": true,
         "RSA15": true,
         "RSA17": true,
+        "RSA18": true,
         "RSA19": true,
         "RSA20": true,
         "SCO10": true,
@@ -2654,6 +2656,7 @@
         "USA15": true,
         "USA16": true,
         "USA17": true,
+        "USA18": true,
         "USA19": true,
         "USA20": true,
         "UZB10": true,
@@ -2744,7 +2747,7 @@
         "TUR20": 1,
         "UZB19": 1
       },
-      "updated_at": "2026-06-05T02:39:40.932792+00:00"
+      "updated_at": "2026-06-08T19:04:08.120692+00:00"
     },
     {
       "user_id": 6,
