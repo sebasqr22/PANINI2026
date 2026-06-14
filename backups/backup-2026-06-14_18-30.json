@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-07T07:25:31.032052+00:00",
+  "generated_at": "2026-06-14T18:30:57.271110+00:00",
   "total_users": 8,
   "total_collections": 7,
   "users": [
@@ -1042,7 +1042,6 @@
         "UZB20": true
       },
       "repeated": {
-        "ARG6": 1,
         "CAN1": 2,
         "CC07": 1,
         "CIV3": 1,
@@ -1052,18 +1051,15 @@
         "ECU8": 2,
         "ESP2": 1,
         "FRA4": 1,
-        "FRA8": 1,
         "GER4": 1,
         "GHA3": 1,
         "HAI3": 1,
-        "KSA3": 1,
         "KSA4": 1,
         "KSA7": 1,
         "MAR2": 1,
         "MAR7": 2,
-        "MEX8": 2,
+        "MEX8": 1,
         "MEX9": 1,
-        "NED6": 1,
         "NOR6": 1,
         "NOR7": 1,
         "PAN6": 1,
@@ -1076,17 +1072,14 @@
         "UZB9": 1,
         "AUS12": 1,
         "AUT16": 1,
-        "BEL15": 1,
         "COL20": 1,
         "CRO14": 1,
-        "CRO19": 1,
         "CUW11": 1,
         "CUW12": 1,
         "CUW14": 1,
-        "CUW20": 2,
+        "CUW20": 1,
         "CZE12": 1,
         "ECU20": 1,
-        "EGY14": 1,
         "ESP11": 1,
         "ESP16": 1,
         "FWC01": 1,
@@ -1105,7 +1098,6 @@
         "MAR20": 1,
         "MEX11": 1,
         "MEX13": 2,
-        "NED11": 1,
         "NED20": 1,
         "NOR13": 1,
         "NOR15": 1,
@@ -1125,7 +1117,7 @@
         "UZB16": 1,
         "UZB19": 1
       },
-      "updated_at": "2026-05-27T22:35:36.967715+00:00"
+      "updated_at": "2026-06-14T04:15:31.163369+00:00"
     },
     {
       "user_id": 3,
@@ -2305,6 +2297,7 @@
         "CZE13": true,
         "CZE14": true,
         "CZE15": true,
+        "CZE16": true,
         "CZE17": true,
         "CZE18": true,
         "CZE19": true,
@@ -2571,6 +2564,7 @@
         "RSA14": true,
         "RSA15": true,
         "RSA17": true,
+        "RSA18": true,
         "RSA19": true,
         "RSA20": true,
         "SCO10": true,
@@ -2654,6 +2648,7 @@
         "USA15": true,
         "USA16": true,
         "USA17": true,
+        "USA18": true,
         "USA19": true,
         "USA20": true,
         "UZB10": true,
@@ -2744,7 +2739,7 @@
         "TUR20": 1,
         "UZB19": 1
       },
-      "updated_at": "2026-06-05T02:39:40.932792+00:00"
+      "updated_at": "2026-06-08T19:04:08.120692+00:00"
     },
     {
       "user_id": 6,
