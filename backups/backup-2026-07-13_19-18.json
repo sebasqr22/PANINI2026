@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-06T19:50:24.621870+00:00",
+  "generated_at": "2026-07-13T19:18:25.527750+00:00",
   "total_users": 8,
   "total_collections": 7,
   "users": [
@@ -2132,6 +2132,7 @@
         "SWE2": true,
         "SWE3": true,
         "SWE4": true,
+        "SWE5": true,
         "SWE6": true,
         "SWE7": true,
         "SWE8": true,
@@ -2385,6 +2386,7 @@
         "ESP14": true,
         "ESP15": true,
         "ESP16": true,
+        "ESP17": true,
         "ESP18": true,
         "ESP19": true,
         "ESP20": true,
@@ -2423,6 +2425,7 @@
         "GER11": true,
         "GER12": true,
         "GER13": true,
+        "GER14": true,
         "GER15": true,
         "GER16": true,
         "GER17": true,
@@ -2746,7 +2749,6 @@
         "CPV18": 1,
         "CUW18": 1,
         "ENG17": 4,
-        "ENG20": 1,
         "ESP14": 1,
         "FWC00": 2,
         "FWC13": 3,
@@ -2759,7 +2761,7 @@
         "RSA19": 1,
         "SEN17": 1
       },
-      "updated_at": "2026-06-29T19:37:31.460895+00:00"
+      "updated_at": "2026-07-13T00:11:27.045401+00:00"
     },
     {
       "user_id": 6,
